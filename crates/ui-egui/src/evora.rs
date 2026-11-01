@@ -85,7 +85,13 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     "protect.remove_hidden",
     // Q47 (a): the rest of the Scan & OCR family.
     "ocr.enhance_camera",
-    // SABORDAGE QA (EVORA-COL-61) S1 : les masques F6 de EVORA-COL-58 retirés (à retirer par le commit suivant).
+    // EVORA-COL-58 (F6): the AI assistant, outside Evora's AI service (repository rule 6).
+    "ai.summary",
+    "ai.ask",
+    "ai.translate",
+    // EVORA-COL-58 (F6): the rest of the « Use JavaScript » tool (its console is hidden above).
+    "js.document",
+    "js.actions",
     // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
     // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
 ];
@@ -233,8 +239,9 @@ impl PdfCraftApp {
         if !self.has_unsaved_work(index) {
             return HostSaveAnswer::Clean;
         }
-        // SABORDAGE QA (EVORA-COL-61) S2 : garde F4 retirée (à retirer par le commit suivant).
-        let _ = autosave;
+        if autosave && self.typing_session(index) {
+            return HostSaveAnswer::Busy;
+        }
         HostSaveAnswer::Save
     }
 }
@@ -256,8 +263,7 @@ pub fn family_has_char(fonts: &egui::FontDefinitions, family: &egui::FontFamily,
 /// Evora (EVORA-COL-58, F5): the arrow of a submenu button. egui draws U+23F5, a glyph only its
 /// emoji face has, and E10 takes that face out of the font stacks (`theme`): the arrow showed as
 /// « ? ». U+203A is in Inter, the interface's face, and is no emoji.
-// SABORDAGE QA (EVORA-COL-61) S3 : flèche d'egui U+23F5 rendue (à retirer par le commit suivant).
-pub(crate) const SUBMENU_ARROW: &str = "\u{23F5}";
+pub(crate) const SUBMENU_ARROW: &str = "\u{203A}";
 
 /// [`egui::Ui::menu_button`], a submenu's arrow drawn as [`SUBMENU_ARROW`] (a menu bar's or a
 /// toolbar's menu button has no arrow and is egui's).
