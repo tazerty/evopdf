@@ -4046,7 +4046,7 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                             ui.close();
                         }
                     };
-                    ui.menu_button(tl!("Align"), |ui| {
+                    crate::evora::menu_button(ui, tl!("Align"), |ui| {
                         pick(ui, A::AlignLeft, "Left");
                         pick(ui, A::AlignRight, "Right");
                         pick(ui, A::AlignTop, "Top");
@@ -4054,11 +4054,11 @@ pub fn document_area(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui) {
                         pick(ui, A::AlignCenterV, "Center vertically");
                         pick(ui, A::AlignCenterH, "Center horizontally");
                     });
-                    ui.menu_button(tl!("Distribute"), |ui| {
+                    crate::evora::menu_button(ui, tl!("Distribute"), |ui| {
                         pick(ui, A::DistributeH, "Horizontally");
                         pick(ui, A::DistributeV, "Vertically");
                     });
-                    ui.menu_button(tl!("Set Fields to Same Size"), |ui| {
+                    crate::evora::menu_button(ui, tl!("Set Fields to Same Size"), |ui| {
                         pick(ui, A::SameHeight, "Height");
                         pick(ui, A::SameWidth, "Width");
                         pick(ui, A::SameSize, "Both");

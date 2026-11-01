@@ -20,6 +20,15 @@
 //!   is met, Evora Drive keeps versions (F7, lot DRV-4) and Colophon's workspace saves documents as
 //!   new Drive versions. The picture menu of that tool keeps its redaction and OCR items out
 //!   (`edit_text_ui::image_menu`), and the Edit panel links no hidden tool (`panels::edit_panel`).
+//! - EVORA-COL-58 (F6): the AI assistant tool (a model the member would bring himself: Evora's AI
+//!   goes through Evora's own service, repository rule 6) and the rest of the « Use JavaScript » tool
+//!   (document scripts and actions, whose added scripts Colophon refuses on save) are hidden; both
+//!   tool groups disappear. Tools ▸ Document JavaScripts… and Add a digital signature field (an
+//!   empty field, no signature) stay, as decided before; they are left to Evora's arbitration.
+//!
+//! Two fixes of the bridge's daily use live here too (EVORA-COL-58): an automatic save asked by
+//! Evora never interrupts typing ([`PdfCraftApp::host_save_answer`], F4), and a submenu's arrow is
+//! drawn in a glyph the interface's fonts have ([`menu_button`], F5).
 //!
 //! Hidden commands and catalogue items stay out of the menus, the command palette, the keyboard
 //! shortcuts list, the tool panels and Home, and do nothing if run another way; a tool group whose
@@ -76,6 +85,13 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     "protect.remove_hidden",
     // Q47 (a): the rest of the Scan & OCR family.
     "ocr.enhance_camera",
+    // EVORA-COL-58 (F6): the AI assistant, outside Evora's AI service (repository rule 6).
+    "ai.summary",
+    "ai.ask",
+    "ai.translate",
+    // EVORA-COL-58 (F6): the rest of the « Use JavaScript » tool (its console is hidden above).
+    "js.document",
+    "js.actions",
     // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
     // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
 ];
@@ -179,4 +195,77 @@ impl PdfCraftApp {
             })
             .collect()
     }
+}
+
+/// Evora (EVORA-COL-58, F4): the host bridge's answer to Evora's `evora:request-save` for one tab
+/// (HOST-PROTOCOL.md §4.3 and §4.5).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostSaveAnswer {
+    /// No such tab: `evora:ack {ok: false, code: "not_found"}`.
+    NotFound,
+    /// Nothing to save: `evora:ack {ok: true, code: "clean"}`.
+    Clean,
+    /// An automatic save while the member types: `evora:ack {ok: false, code: "busy"}`. Nothing is
+    /// committed, closed or moved off the keyboard; Evora keeps its state and asks again on its next
+    /// cycle (§4.5), and the typing goes with that save or the member's own.
+    Busy,
+    /// Save now, typing committed first (#166), as before: `evora:save`.
+    Save,
+}
+
+impl PdfCraftApp {
+    /// Evora (EVORA-COL-58, F4): whether the member is typing in tab `index`: new text being added, a
+    /// paragraph open for editing, a form field or the Fill & Sign type box open, or a text field of
+    /// the interface holding the keyboard. A save commits each of them, which closes the box: the
+    /// letters typed next would go to the tools' keys (H picks the Hand).
+    pub fn typing_session(&self, index: usize) -> bool {
+        let Some(v) = self.views.get(index) else { return false };
+        v.content.draft.is_some()
+            || v.line_editor.is_some()
+            || v.forms.focus.is_some()
+            || v.fill_text.is_some()
+            || self.ctx.as_ref().is_some_and(|ctx| ctx.text_edit_focused())
+    }
+
+    /// Evora (EVORA-COL-58, F4): how the bridge answers Evora's `evora:request-save` for tab `index`.
+    /// An automatic save (`autosave`, Evora's timer) waits while the member types: answering at once
+    /// with `busy` keeps Evora's single save request free for a save the member asks for, and no
+    /// unchanged version reaches Evora Drive. Every other reason (`user`, `close`, `logout`,
+    /// `visibility`) saves as before, typing committed first.
+    pub fn host_save_answer(&self, index: usize, autosave: bool) -> HostSaveAnswer {
+        if index >= self.views.len() {
+            return HostSaveAnswer::NotFound;
+        }
+        if !self.has_unsaved_work(index) {
+            return HostSaveAnswer::Clean;
+        }
+        if autosave && self.typing_session(index) {
+            return HostSaveAnswer::Busy;
+        }
+        HostSaveAnswer::Save
+    }
+}
+
+/// Evora (EVORA-COL-58, F5): the arrow of a submenu button. egui draws U+23F5, a glyph only its
+/// emoji face has, and E10 takes that face out of the font stacks (`theme`): the arrow showed as
+/// « ? ». U+203A is in Inter, the interface's face, and is no emoji.
+pub(crate) const SUBMENU_ARROW: &str = "\u{203A}";
+
+/// [`egui::Ui::menu_button`], a submenu's arrow drawn as [`SUBMENU_ARROW`] (a menu bar's or a
+/// toolbar's menu button has no arrow and is egui's).
+pub(crate) fn menu_button<'a, R>(
+    ui: &mut egui::Ui,
+    atoms: impl egui::IntoAtoms<'a>,
+    add_contents: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<Option<R>> {
+    if !egui::containers::menu::is_in_menu(ui) {
+        return ui.menu_button(atoms, add_contents);
+    }
+    let (response, inner) = sub_menu_button(atoms).ui(ui, add_contents);
+    egui::InnerResponse::new(inner.map(|i| i.inner), response)
+}
+
+/// [`egui::containers::menu::SubMenuButton::new`], with [`SUBMENU_ARROW`].
+pub(crate) fn sub_menu_button<'a>(atoms: impl egui::IntoAtoms<'a>) -> egui::containers::menu::SubMenuButton<'a> {
+    egui::containers::menu::SubMenuButton::from_button(egui::Button::new(atoms).right_text(SUBMENU_ARROW))
 }

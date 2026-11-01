@@ -117,8 +117,13 @@ fn fnv1a(hash: u64, bytes: &[u8]) -> u64 {
 }
 
 /// The catalog now: its entries in registry order, the engine's language code, and the catalog's
-/// identity `hash` (FNV-1a 64 of each id and its destructive flag, in order: the same in every
-/// language and every state; Evora's provisioning copies it from `commands.json`).
+/// identity `hash`: the same in every language and every state.
+///
+/// EVORA-COL-58: `hash` follows Evora's norm (HOST-PROTOCOL.md section 9.1, as Evora's provisioning
+/// and shell compute it, `CommandCatalog::fingerprint` of `bin/creative-provision.php`): FNV-1a 64 of
+/// every id in order, each one followed by `!` when the command is destructive and by a line feed
+/// otherwise, in 16 lowercase hexadecimal digits. The bridge used to hash each id, then a NUL byte and
+/// `1` or `0`, then a line feed: Evora's provisioning refused that catalog and served none.
 pub fn catalog(app: &PdfCraftApp) -> (Vec<Entry>, &'static str, String) {
     let mut hash = FNV_OFFSET;
     let mut entries = Vec::new();
@@ -128,8 +133,7 @@ pub fn catalog(app: &PdfCraftApp) -> (Vec<Entry>, &'static str, String) {
         }
         let destructive = DESTRUCTIVE.contains(&id);
         hash = fnv1a(hash, id.as_bytes());
-        hash = fnv1a(hash, if destructive { b"\x001" } else { b"\x000" });
-        hash = fnv1a(hash, b"\n");
+        hash = fnv1a(hash, if destructive { b"!" } else { b"\n" });
         let path = menu.map(|m| bounded(&m, id));
         entries.push(Entry { id, label: bounded(&label, id), path, enabled, destructive });
     }

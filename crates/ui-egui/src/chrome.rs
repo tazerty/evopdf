@@ -546,10 +546,10 @@ fn main_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     egui::Popup::menu(&resp).show(|ui| {
         scroll_menu(ui, |ui| {
             ui.set_min_width(230.0);
-            ui.menu_button(tl!("File"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "File")));
-            ui.menu_button(tl!("Edit"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Edit")));
-            ui.menu_button(tl!("Pages"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Pages")));
-            ui.menu_button(tl!("View"), |ui| {
+            crate::evora::menu_button(ui, tl!("File"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "File")));
+            crate::evora::menu_button(ui, tl!("Edit"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Edit")));
+            crate::evora::menu_button(ui, tl!("Pages"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Pages")));
+            crate::evora::menu_button(ui, tl!("View"), |ui| {
                 scroll_menu(ui, |ui| {
                     if let Some(i) = app.active {
                         let v = &mut app.views[i];
@@ -602,8 +602,8 @@ fn main_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                         ui.separator();
                     }
                     crate::commands::registry_menu(app, ui, "View");
-                    ui.menu_button(tl!("Display theme"), |ui| theme_menu(app, ui));
-                    ui.menu_button(tl!("Side panels"), |ui| {
+                    crate::evora::menu_button(ui, tl!("Display theme"), |ui| theme_menu(app, ui));
+                    crate::evora::menu_button(ui, tl!("Side panels"), |ui| {
                         scroll_menu(ui, |ui| {
                             for (p, label) in [
                                 (RightPanel::Comments, tl!("Comments")),
@@ -626,7 +626,7 @@ fn main_menu(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
                     });
                 })
             });
-            ui.menu_button(tl!("Help"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Help")));
+            crate::evora::menu_button(ui, tl!("Help"), |ui| scroll_menu(ui, |ui| crate::commands::registry_menu(app, ui, "Help")));
         })
     });
 }

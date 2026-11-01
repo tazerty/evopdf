@@ -1262,7 +1262,7 @@ fn outline_item(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, item: &OutlineIte
                 pick(ui, &set_page, true, BmAction::SetToCurrentPage(path.to_vec()));
                 // The title's style and colour (ISO 32000-2 §12.3.3, Tables 151 and 152).
                 let mut styled = None;
-                ui.menu_button(tl!("Style"), |ui| {
+                crate::evora::menu_button(ui, tl!("Style"), |ui| {
                     let (mut bold, mut italic) = (item.bold, item.italic);
                     if ui.add(crate::widgets::checkbox(&mut bold, tl!("Bold"))).clicked() {
                         styled = Some(BmAction::SetStyle(path.to_vec(), Some(bold), None));
@@ -1271,7 +1271,7 @@ fn outline_item(ui: &mut egui::Ui, t: &Tokens, info: &DocInfo, item: &OutlineIte
                         styled = Some(BmAction::SetStyle(path.to_vec(), None, Some(italic)));
                     }
                 });
-                ui.menu_button(tl!("Colour"), |ui| {
+                crate::evora::menu_button(ui, tl!("Colour"), |ui| {
                     let current = item.color.map_or([0.0; 3], |c| c.map(f64::from));
                     if let Some(c) = crate::comments::swatch_grid(ui, Some(current)) {
                         styled = Some(BmAction::SetColor(path.to_vec(), c));

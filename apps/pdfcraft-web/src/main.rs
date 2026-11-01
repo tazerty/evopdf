@@ -614,6 +614,10 @@ mod host {
 /// names (E9), and the running totals are published as
 /// `window.__evoraAudit = { frames, texts, emoji, terms, sample, selftest, dark, probe }`, where
 /// `probe` counts the drawn texts containing `?evora-probe=` (E3: the imposed language shows).
+/// EVORA-COL-58 (F5): also `missing` (characters drawn that no font of their text has, shown as
+/// « ? », once each), `missing_now` (those of the last frame), `glyph_selftest`, and for each probe
+/// `exact_now` (texts of the last frame equal to it) and `positions` (the centre, in CSS pixels, of
+/// the last one drawn equal to it, where the smoke test clicks).
 #[cfg(target_arch = "wasm32")]
 mod e10 {
     use eframe::wasm_bindgen::JsValue;
@@ -661,6 +665,28 @@ mod e10 {
         /// `?evora-probe=a|b|c` (EVORA-COL-25): texts drawn that contain each probe. One probe
         /// without `|` counts as before; `probe` (texts with any probe) stays.
         probes: Vec<(String, u64)>,
+        /// EVORA-COL-58: for each probe, the texts of the last frame equal to it, and where the last
+        /// one was drawn (CSS pixels).
+        exact_now: Vec<u64>,
+        positions: Vec<Option<egui::Pos2>>,
+        /// EVORA-COL-58 (F5): characters drawn without a glyph in their text's fonts, once each (at
+        /// most [`MISSING_MAX`]), those of the last frame, and the first text that had one.
+        missing: Vec<char>,
+        missing_now: Vec<char>,
+        missing_sample: String,
+        /// The glyph detector answers: a letter has a glyph, a private-use character has none.
+        glyph_selftest: bool,
+    }
+
+    /// At most this many distinct characters without a glyph are reported.
+    const MISSING_MAX: usize = 64;
+
+    /// A character drawn without a glyph shows as « ? »; spaces, controls and format characters
+    /// draw nothing.
+    fn drawn(c: char) -> bool {
+        !(c.is_whitespace()
+            || c.is_control()
+            || matches!(c as u32, 0x00AD | 0x200B..=0x200F | 0x202A..=0x202E | 0x2060..=0x206F | 0xFE00..=0xFE0F | 0xFEFF))
     }
 
     fn sensitive_terms(text: &str) -> u64 {
@@ -682,26 +708,55 @@ mod e10 {
     impl Audit {
         pub fn new(probe: Option<String>) -> Self {
             let probes: Vec<(String, u64)> = probe.as_deref().map(|p| p.split('|').filter(|s| !s.is_empty()).map(|s| (s.to_string(), 0)).collect()).unwrap_or_default();
-            Self { probes, ..Self::default() }
+            let (exact_now, positions) = (vec![0; probes.len()], vec![None; probes.len()]);
+            Self { probes, exact_now, positions, ..Self::default() }
         }
 
-        fn scan(&mut self, shape: &egui::Shape) {
+        /// EVORA-COL-58 (F5): the characters of `text` that none of its fonts has.
+        fn glyphs(&mut self, text: &egui::epaint::TextShape, fonts: &mut egui::epaint::FontsView<'_>) {
+            let families: Vec<egui::FontId> = text.galley.job.sections.iter().map(|s| s.format.font_id.clone()).collect();
+            let shown = text.galley.text();
+            for c in shown.chars() {
+                if !drawn(c) || self.missing_now.contains(&c) || families.iter().any(|f| fonts.has_glyph(f, c)) {
+                    continue;
+                }
+                self.missing_now.push(c);
+                if !self.missing.contains(&c) && self.missing.len() < MISSING_MAX {
+                    self.missing.push(c);
+                }
+                if self.missing_sample.is_empty() {
+                    self.missing_sample = shown.chars().take(120).collect();
+                }
+            }
+        }
+
+        fn scan(&mut self, shape: &egui::Shape, fonts: &mut egui::epaint::FontsView<'_>, zoom: f32) {
             match shape {
                 egui::Shape::Vec(shapes) => {
                     for s in shapes {
-                        self.scan(s);
+                        self.scan(s, fonts, zoom);
                     }
                 }
                 egui::Shape::Text(text) => {
                     self.texts += 1;
+                    self.glyphs(text, fonts);
                     let shown = text.galley.text();
                     let emoji = shown.chars().filter(|c| is_emoji_like(*c)).count() as u64;
                     let terms = sensitive_terms(shown);
                     let mut hit = false;
-                    for (probe, count) in &mut self.probes {
+                    for (n, (probe, count)) in self.probes.iter_mut().enumerate() {
                         if shown.contains(probe.as_str()) {
                             *count += 1;
                             hit = true;
+                        }
+                        if shown == probe.as_str() {
+                            let centre = text.visual_bounding_rect().center();
+                            if let Some(now) = self.exact_now.get_mut(n) {
+                                *now += 1;
+                            }
+                            if let Some(at) = self.positions.get_mut(n) {
+                                *at = Some(egui::pos2(centre.x * zoom, centre.y * zoom));
+                            }
                         }
                     }
                     if hit {
@@ -731,9 +786,30 @@ mod e10 {
                 ("selftest", JsValue::from_bool(selftest())),
                 ("dark", JsValue::from_bool(self.dark)),
                 ("probe", JsValue::from_f64(self.probe_hits as f64)),
+                ("missing_sample", JsValue::from_str(&self.missing_sample)),
+                ("glyph_selftest", JsValue::from_bool(self.glyph_selftest)),
             ] {
                 let _ = js_sys::Reflect::set(&report, &JsValue::from_str(key), &value);
             }
+            for (key, chars) in [("missing", &self.missing), ("missing_now", &self.missing_now)] {
+                let list = js_sys::Array::new();
+                for c in chars {
+                    list.push(&JsValue::from_str(&format!("U+{:04X}", *c as u32)));
+                }
+                let _ = js_sys::Reflect::set(&report, &JsValue::from_str(key), &list);
+            }
+            let (exact, positions) = (js_sys::Object::new(), js_sys::Object::new());
+            for (n, (probe, _)) in self.probes.iter().enumerate() {
+                let key = JsValue::from_str(probe);
+                let now = self.exact_now.get(n).copied().unwrap_or(0);
+                let _ = js_sys::Reflect::set(&exact, &key, &JsValue::from_f64(now as f64));
+                if let Some(Some(at)) = self.positions.get(n) {
+                    let pair = js_sys::Array::of2(&JsValue::from_f64(f64::from(at.x)), &JsValue::from_f64(f64::from(at.y)));
+                    let _ = js_sys::Reflect::set(&positions, &key, &pair);
+                }
+            }
+            let _ = js_sys::Reflect::set(&report, &JsValue::from_str("exact_now"), &exact);
+            let _ = js_sys::Reflect::set(&report, &JsValue::from_str("positions"), &positions);
             let probes = js_sys::Object::new();
             for (probe, count) in &self.probes {
                 let _ = js_sys::Reflect::set(&probes, &JsValue::from_str(probe), &JsValue::from_f64(*count as f64));
@@ -751,9 +827,17 @@ mod e10 {
         fn output_hook(&mut self, ctx: &egui::Context, output: &mut egui::FullOutput) {
             self.frames += 1;
             self.dark = ctx.global_style().visuals.dark_mode;
-            for clipped in &output.shapes {
-                self.scan(&clipped.shape);
-            }
+            // EVORA-COL-58: the last frame's exact probes and missing glyphs start afresh.
+            self.exact_now.iter_mut().for_each(|n| *n = 0);
+            self.missing_now.clear();
+            let zoom = ctx.zoom_factor();
+            ctx.fonts_mut(|fonts| {
+                let probe = egui::FontId::proportional(13.0);
+                self.glyph_selftest = fonts.has_glyph(&probe, 'A') && !fonts.has_glyph(&probe, '\u{10FFFD}');
+                for clipped in &output.shapes {
+                    self.scan(&clipped.shape, fonts, zoom);
+                }
+            });
             self.publish();
         }
     }
@@ -880,8 +964,9 @@ mod ehp {
         Init { settings: Option<String>, writable: bool, lang: Option<&'static str>, dark: bool, author: Option<String> },
         Lang(Option<&'static str>),
         Theme(bool),
-        /// COL-08: `evora:request-save` `re` for the session's document `doc` (`DocId.0`).
-        RequestSave { re: String, doc: u64 },
+        /// COL-08: `evora:request-save` `re` for the session's document `doc` (`DocId.0`), and whether
+        /// its reason is `autosave` (EVORA-COL-58: an automatic save never interrupts typing).
+        RequestSave { re: String, doc: u64, autosave: bool },
         /// `evora:open` `re` (COL-40): the app opens the bytes, then the bridge answers. S-ACK-6: the
         /// same `docRef` again ("reload the server's version") replaces the document it names.
         Open(OpenRequest),
@@ -1604,7 +1689,8 @@ mod ehp {
     /// (`EvoraApp::request_save`): `evora:save` with `re`, or `evora:ack {ok: true, code: "clean"}`.
     fn on_request_save(state: &Rc<RefCell<State>>, id: &str, p: &JsValue) {
         let st = state.borrow();
-        if !only_keys(p, &["reason", "docRef"]) || !get(p, "reason").as_string().is_some_and(|r| SAVE_REASONS.contains(&r.as_str())) {
+        let Some(reason) = get(p, "reason").as_string().filter(|r| SAVE_REASONS.contains(&r.as_str())) else { return };
+        if !only_keys(p, &["reason", "docRef"]) {
             return;
         }
         let doc_ref = get(p, "docRef");
@@ -1628,7 +1714,7 @@ mod ehp {
             ack(&st, id, false, Some("not_found"));
             return;
         };
-        st.events.borrow_mut().push(HostEvent::RequestSave { re: id.to_string(), doc });
+        st.events.borrow_mut().push(HostEvent::RequestSave { re: id.to_string(), doc, autosave: reason == "autosave" });
         st.ctx.request_repaint();
     }
 
@@ -1966,7 +2052,7 @@ impl EvoraApp {
                     self.catalog_due = true;
                 }
                 ehp::HostEvent::Theme(dark) => self.set_dark(dark),
-                ehp::HostEvent::RequestSave { re, doc } => self.request_save(&re, doc),
+                ehp::HostEvent::RequestSave { re, doc, autosave } => self.request_save(&re, doc, autosave),
                 ehp::HostEvent::Command { re, command, params_empty, confirmed } => {
                     self.run_command(&re, &command, params_empty, confirmed);
                 }
@@ -2091,20 +2177,27 @@ impl EvoraApp {
 
     /// COL-08: the host's `evora:request-save` `re`, for the session's document `doc`: `evora:save`
     /// with `re` when it has unsaved work, `evora:ack {ok: true, code: "clean"}` otherwise.
-    fn request_save(&mut self, re: &str, doc: u64) {
+    /// EVORA-COL-58 (F4): an `autosave` that comes while the member types is answered `busy` at once
+    /// (`PdfCraftApp::host_save_answer`): the typing stays open, on the keyboard, and Evora asks again
+    /// on its next cycle (HOST-PROTOCOL.md §4.5); the other reasons commit the typing and save.
+    fn request_save(&mut self, re: &str, doc: u64, autosave: bool) {
+        use pdfcraft_ui_egui::HostSaveAnswer;
         let Some(link) = self.link.clone() else { return };
         let Some(index) = self.index_of(doc) else {
             link.answer(re, false, "not_found");
             return;
         };
-        if !self.inner.has_unsaved_work(index) {
-            link.answer(re, true, "clean");
-            return;
-        }
-        link.arm_request(re);
-        let _ = self.inner.save_view(index, pdfcraft_ui_egui::SaveTarget::InPlace);
-        if let Some(code) = link.disarm_request() {
-            link.answer(re, false, code);
+        match self.inner.host_save_answer(index, autosave) {
+            HostSaveAnswer::NotFound => link.answer(re, false, "not_found"),
+            HostSaveAnswer::Clean => link.answer(re, true, "clean"),
+            HostSaveAnswer::Busy => link.answer(re, false, "busy"),
+            HostSaveAnswer::Save => {
+                link.arm_request(re);
+                let _ = self.inner.save_view(index, pdfcraft_ui_egui::SaveTarget::InPlace);
+                if let Some(code) = link.disarm_request() {
+                    link.answer(re, false, code);
+                }
+            }
         }
     }
 

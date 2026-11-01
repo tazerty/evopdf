@@ -104,7 +104,7 @@ pub(crate) fn panel(ui: &mut egui::Ui, t: &Tokens, look: &mut AddedText, extras:
                     out.font = Some(FontChoice::Load);
                 }
                 #[cfg(not(target_arch = "wasm32"))]
-                ui.menu_button(tl!("Installed fonts…"), |ui| match crate::files::installed_font_files(ui.ctx()) {
+                crate::evora::menu_button(ui, tl!("Installed fonts…"), |ui| match crate::files::installed_font_files(ui.ctx()) {
                     Some(list) if list.is_empty() => {
                         ui.label(tl!("No openly licensed document fonts found. Load a font file."));
                     }

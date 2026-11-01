@@ -1965,7 +1965,7 @@ pub(crate) fn context_menu(
                 ui.close();
             }
             ui.add_enabled_ui(allowed, |ui| {
-                ui.menu_button(tl!("Set status"), |ui| {
+                crate::evora::menu_button(ui, tl!("Set status"), |ui| {
                     for s in [ReviewState::None, ReviewState::Accepted, ReviewState::Cancelled, ReviewState::Completed, ReviewState::Rejected] {
                         if ui.button(tl!(s.name())).clicked() {
                             action =
@@ -1975,7 +1975,7 @@ pub(crate) fn context_menu(
                     }
                 });
                 let keep_open = egui::containers::menu::MenuConfig::new().close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-                let _ = egui::containers::menu::SubMenuButton::new(tl!("Colour")).config(keep_open).ui(ui, |ui| {
+                let _ = crate::evora::sub_menu_button(tl!("Colour")).config(keep_open).ui(ui, |ui| {
                     if let Some(c) = swatch_grid(ui, a.color.map(|c| c.map(f64::from))) {
                         action = Some(CanvasAction::Edit(Box::new(Edit::StyleAnnotation {
                             page,
@@ -2587,7 +2587,7 @@ mod tests {
         h.run();
         h.get_by_label("Page").click_secondary();
         h.run();
-        h.get_by_label("Colour ⏵").click();
+        h.get_by_label("Colour ›").click();
         h.run();
         h.get_by_label("Other colour…").click();
         h.run();
