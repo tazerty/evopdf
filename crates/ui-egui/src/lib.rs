@@ -167,7 +167,7 @@ use pdfcraft_engine::{DocId, Session};
 pub use canvas::{DocView, RasterMemory};
 pub use editing::{CloseRequest, SaveTarget};
 // Evora (EVORA-COL-58, F4): how the host bridge answers Evora's request to save a tab.
-pub use evora::HostSaveAnswer;
+pub use evora::{HostSaveAnswer, family_has_char};
 pub use files::{ExtractDraft, FilePurpose, FileRequest, RotateDraft, SplitDraft, SplitMode, SplitPlan};
 pub use recovery::{AUTOSAVE_SECS, RecoveryMeta, RecoveryStore};
 use theme::{ThemeKind, ThemePreference};

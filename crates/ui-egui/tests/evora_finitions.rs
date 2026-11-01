@@ -15,7 +15,7 @@
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use pdfcraft_ui_egui::{HostSaveAnswer, PdfCraftApp, QuickTool, SaveTarget};
+use pdfcraft_ui_egui::{HostSaveAnswer, PdfCraftApp, QuickTool, SaveTarget, family_has_char};
 
 /// What the member types before Evora's autosave comes, and after it (H picks the Hand).
 const FIRST: &str = "Ligne ajoutée dans Col";
@@ -193,7 +193,8 @@ fn drawn(c: char) -> bool {
     !(c.is_whitespace() || c.is_control() || matches!(c as u32, 0x00AD | 0x200B..=0x200F | 0x202A..=0x202E | 0x2060..=0x206F | 0xFE00..=0xFE0F | 0xFEFF))
 }
 
-/// Every character painted on the last frame that no font of its text's families has, once each.
+/// Every character painted on the last frame that no face of its text's families has in its character
+/// map (`family_has_char`), once each.
 fn missing_glyphs(h: &Harness<'static, PdfCraftApp>) -> Vec<char> {
     fn texts(shape: &egui::Shape, out: &mut Vec<std::sync::Arc<egui::Galley>>) {
         match shape {
@@ -206,11 +207,12 @@ fn missing_glyphs(h: &Harness<'static, PdfCraftApp>) -> Vec<char> {
     for clipped in &h.output().shapes {
         texts(&clipped.shape, &mut galleys);
     }
+    let defs = h.ctx.fonts(|f| f.definitions().clone());
     let mut missing: Vec<char> = Vec::new();
     for galley in galleys {
-        let fonts: Vec<egui::FontId> = galley.job.sections.iter().map(|s| s.format.font_id.clone()).collect();
+        let families: Vec<egui::FontFamily> = galley.job.sections.iter().map(|s| s.format.font_id.family.clone()).collect();
         for c in galley.text().chars() {
-            if drawn(c) && !missing.contains(&c) && !fonts.iter().any(|f| h.ctx.fonts_mut(|all| all.has_glyph(f, c))) {
+            if drawn(c) && !missing.contains(&c) && !families.iter().any(|f| family_has_char(&defs, f, c)) {
                 missing.push(c);
             }
         }
@@ -225,6 +227,10 @@ fn the_main_menu_draws_every_glyph() {
     let alone = std::env::var("PDFCRAFT_SYSTEM_FONTS").is_ok_and(|value| value == "0");
     v.holds(alone, || "prémisse : PDFCRAFT_SYSTEM_FONTS=0 absent, des polices du système servent de repli".to_string());
     let mut h = harness();
+    // Premise: the detector answers (a letter is drawn, a private-use character isn't).
+    let defs = h.ctx.fonts(|f| f.definitions().clone());
+    let answers = family_has_char(&defs, &egui::FontFamily::Proportional, 'A') && !family_has_char(&defs, &egui::FontFamily::Proportional, '\u{10FFFD}');
+    v.holds(answers, || "prémisse : détecteur de glyphes muet (A sans glyphe ou U+10FFFD avec)".to_string());
     let before = missing_glyphs(&h);
     let submenus = |h: &Harness<'static, PdfCraftApp>| ["File ", "Edit ", "Pages ", "View ", "Help "].map(|p| h.query_all_by_label_contains(p).count());
     let closed = submenus(&h);

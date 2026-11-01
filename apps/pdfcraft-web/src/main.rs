@@ -676,6 +676,10 @@ mod e10 {
         missing_sample: String,
         /// The glyph detector answers: a letter has a glyph, a private-use character has none.
         glyph_selftest: bool,
+        /// Whether a family's faces have a character (`family_has_char`), cached for the fonts
+        /// counted in `covered_for` (fonts change when they are installed or the language changes).
+        covered: std::collections::HashMap<(char, egui::FontFamily), bool>,
+        covered_for: usize,
     }
 
     /// At most this many distinct characters without a glyph are reported.
@@ -712,12 +716,16 @@ mod e10 {
             Self { probes, exact_now, positions, ..Self::default() }
         }
 
-        /// EVORA-COL-58 (F5): the characters of `text` that none of its fonts has.
-        fn glyphs(&mut self, text: &egui::epaint::TextShape, fonts: &mut egui::epaint::FontsView<'_>) {
-            let families: Vec<egui::FontId> = text.galley.job.sections.iter().map(|s| s.format.font_id.clone()).collect();
+        /// EVORA-COL-58 (F5): the characters of `text` that no face of its families has.
+        fn glyphs(&mut self, text: &egui::epaint::TextShape, defs: &egui::FontDefinitions) {
+            let families: Vec<egui::FontFamily> = text.galley.job.sections.iter().map(|s| s.format.font_id.family.clone()).collect();
             let shown = text.galley.text();
             for c in shown.chars() {
-                if !drawn(c) || self.missing_now.contains(&c) || families.iter().any(|f| fonts.has_glyph(f, c)) {
+                if !drawn(c) || self.missing_now.contains(&c) {
+                    continue;
+                }
+                let covered = &mut self.covered;
+                if families.iter().any(|f| *covered.entry((c, f.clone())).or_insert_with(|| pdfcraft_ui_egui::family_has_char(defs, f, c))) {
                     continue;
                 }
                 self.missing_now.push(c);
@@ -730,16 +738,16 @@ mod e10 {
             }
         }
 
-        fn scan(&mut self, shape: &egui::Shape, fonts: &mut egui::epaint::FontsView<'_>, zoom: f32) {
+        fn scan(&mut self, shape: &egui::Shape, defs: &egui::FontDefinitions, zoom: f32) {
             match shape {
                 egui::Shape::Vec(shapes) => {
                     for s in shapes {
-                        self.scan(s, fonts, zoom);
+                        self.scan(s, defs, zoom);
                     }
                 }
                 egui::Shape::Text(text) => {
                     self.texts += 1;
-                    self.glyphs(text, fonts);
+                    self.glyphs(text, defs);
                     let shown = text.galley.text();
                     let emoji = shown.chars().filter(|c| is_emoji_like(*c)).count() as u64;
                     let terms = sensitive_terms(shown);
@@ -831,13 +839,18 @@ mod e10 {
             self.exact_now.iter_mut().for_each(|n| *n = 0);
             self.missing_now.clear();
             let zoom = ctx.zoom_factor();
-            ctx.fonts_mut(|fonts| {
-                let probe = egui::FontId::proportional(13.0);
-                self.glyph_selftest = fonts.has_glyph(&probe, 'A') && !fonts.has_glyph(&probe, '\u{10FFFD}');
-                for clipped in &output.shapes {
-                    self.scan(&clipped.shape, fonts, zoom);
-                }
-            });
+            let defs = ctx.fonts(|f| f.definitions().clone());
+            let fonts_count = defs.font_data.len() + defs.families.values().map(Vec::len).sum::<usize>();
+            if fonts_count != self.covered_for {
+                self.covered.clear();
+                self.covered_for = fonts_count;
+            }
+            let p = egui::FontFamily::Proportional;
+            self.glyph_selftest =
+                pdfcraft_ui_egui::family_has_char(&defs, &p, 'A') && !pdfcraft_ui_egui::family_has_char(&defs, &p, '\u{10FFFD}');
+            for clipped in &output.shapes {
+                self.scan(&clipped.shape, &defs, zoom);
+            }
             self.publish();
         }
     }

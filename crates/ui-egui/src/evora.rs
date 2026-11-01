@@ -246,6 +246,20 @@ impl PdfCraftApp {
     }
 }
 
+/// Evora (EVORA-COL-58, F5): whether a face of `family`, as `fonts` define it, has `c` in its character
+/// map, for the CI checks of drawn glyphs (`tests/evora_finitions.rs`, the web build's render audit).
+/// epaint's own `has_glyph` answers false for every character of the face that also holds its
+/// replacement glyph, Inter's letters included.
+pub fn family_has_char(fonts: &egui::FontDefinitions, family: &egui::FontFamily, c: char) -> bool {
+    use skrifa::MetadataProvider as _;
+    fonts.families.get(family).is_some_and(|stack| {
+        stack
+            .iter()
+            .filter_map(|name| fonts.font_data.get(name))
+            .any(|data| skrifa::FontRef::from_index(&data.font, data.index).is_ok_and(|face| face.charmap().map(c).is_some()))
+    })
+}
+
 /// Evora (EVORA-COL-58, F5): the arrow of a submenu button. egui draws U+23F5, a glyph only its
 /// emoji face has, and E10 takes that face out of the font stacks (`theme`): the arrow showed as
 /// « ? ». U+203A is in Inter, the interface's face, and is no emoji.
