@@ -78,8 +78,6 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     "ocr.enhance_camera",
     // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
     // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
-    // SABORDAGE QA (EVORA-COL-55) S1: masked again, to be removed by the next commit.
-    "edit.edit_text",
 ];
 
 pub(crate) fn hidden(id: &str) -> bool {
