@@ -61,7 +61,9 @@ Scénarios, chacun sur un profil Chrome vierge (démarrage à froid) :
      [fin-retraits] ; les destructives ajoutées (couper des pages, retirer la signature ou les initiales
      enregistrées, réinitialiser la disposition des panneaux) sont refusées sans confirmed, sans effet
      [fin-destructive]. Ces deux détecteurs, et eux seuls, rougissent sous le témoin de la correction
-     (FIN_FIX_EXPECTED).
+     (FIN_FIX_EXPECTED). EVORA-COL-53 (commande de Gabriel du 2026-11-01, Q47 tranchée pour l'édition du texte
+     existant et des images, Drive F7 en place) : « edit.edit_text » quitte les commandes masquées et devient un
+     témoin du catalogue, non destructif (il choisit un outil) [fin-catalogue].
 
 Le témoin « pont-ehp-temoin » (scénario 6) cache aussi au moteur, depuis EVORA-COL-39, les clés qu'il croit
 avoir effacées (length, key()) : sa vérification passe, il ne refuse donc pas evora:init, et le banc garde
@@ -2315,16 +2317,18 @@ FIN_IDENTITY = ("signature", "signature_text", "signature_image", "initials", "s
 # Espaces de noms de la coquille, refusés en bloc (avenant §4, règle 1).
 FIN_SHELL = ("file", "create", "app", "help", "prefs")
 # Commandes masquées (COL-05, COL-10, OCR, Q47 a), écrites ici indépendamment de crates/ui-egui/src/evora.rs.
+# EVORA-COL-53 : « edit.edit_text » n'y est plus (commande de Gabriel du 2026-11-01), il est témoin ci-dessous.
 FIN_MASKED = ("help.github", "help.check_updates", "sign.digital", "sign.certify", "sign.certify_invisible",
               "sign.timestamp", "redact.mark", "redact.apply", "redact.sanitize", "ocr.recognize", "ocr.recognize_batch",
               "actions.wizard", "file.open_recent", "comment.import", "form.import_data", "tools.js_console",
-              "edit.edit_text", "protect.remove_hidden")
+              "protect.remove_hidden")
 # Hors catalogue : un document neuf fait des fichiers de l'ordinateur ; le thème est celui de la coquille.
 FIN_OFF = ("page.combine", "view.theme", "view.theme.system", "view.theme.light", "view.theme.dark")
-# Témoins du catalogue : présents, avec ce drapeau destructif.
+# Témoins du catalogue : présents, avec ce drapeau destructif. EVORA-COL-53 : « edit.edit_text » (modifier le texte
+# et les images existants) présent et non destructif : il choisit un outil, chaque modification est un pas d'Annuler.
 FIN_PRESENT = {"page.rotate": False, "page.delete": True, "form.clear": True, "comment.flatten": True,
                "export.docx": False, "export.html": False, "comment.export": False, "edit.undo": False,
-               "print.dialog": False}
+               "print.dialog": False, "edit.edit_text": False}
 # Correction 1 du lot (avenant §5) : marqueurs de retrait, sur l'identifiant (anglais, en tête d'un segment) et sur le
 # libellé du catalogue livré (français, en tête d'un mot) : suppressions, coupes, aplatissements, retraits,
 # effacements, réinitialisations et leurs équivalents.

@@ -22,8 +22,16 @@
 //!
 //! EVORA-COL-38 (rise to v0.14.0): the expanded All tools view (« Expand all tools », all_tools_ui.rs)
 //! lists the catalogue's tools by category and names the items a search finds; a hidden tool must have
-//! no tile and a hidden item no mention (family « vue-outils »). The Edit workspace's quick bar offers
-//! « Edit text & images » (Q47 (a)): it must not while editing existing text is hidden.
+//! no tile and a hidden item no mention (family « vue-outils »).
+//!
+//! EVORA-COL-53: Gabriel's order of 2026-11-01 (« rendre les PDF entièrement éditables ») decides Q47
+//! for editing existing text and images, its condition being met (Evora Drive keeps versions, F7):
+//! « Edit text & images » is offered. Family « perimetre-q47 » judges the holes it would open: the
+//! Edit workspace's quick bar offers the tool, entering Edit (as the mode bar does) turns it on and it
+//! stays on, and the right-click menu of a picture of the fixture shows neither « Redact Image » (a
+//! redaction mark) nor « Recognize Text… » (the engine's OCR), beside its twin witnesses « Save Image
+//! As… » and « Delete » (a menu that isn't drawn can't pass for a mask); the Edit panel links no
+//! hidden tool. Family « temoins » keeps the tool reachable from the palette and as a page tool.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -39,8 +47,8 @@ const REDACTION: &[&str] = &["redact.mark", "redact.pages", "redact.search", "re
 /// recognize text.
 const OCR: &[&str] = &["ocr.recognize", "ocr.recognize_batch", "ocr.enhance", "ocr.correct", "actions.wizard", "actions.optimize_scans"];
 /// Q47 (a), default hypothesis: upstream automations, the engine's recent files, XFDF and FDF
-/// imports, the JavaScript console, the rest of the redaction and Scan & OCR families, editing
-/// existing text (until Evora Drive keeps versions, F7).
+/// imports, the JavaScript console, the rest of the redaction and Scan & OCR families. Editing
+/// existing text and images is offered since EVORA-COL-53 (Gabriel's order of 2026-11-01, F7 met).
 const SCOPE: &[&str] = &[
     "actions.distribution",
     "actions.make_accessible",
@@ -55,7 +63,6 @@ const SCOPE: &[&str] = &[
     "redact.sanitize",
     "protect.remove_hidden",
     "ocr.enhance_camera",
-    "edit.edit_text",
 ];
 /// Tool groups whose items are all hidden: they must disappear.
 const HIDDEN_GROUPS: &[&str] = &["scan", "redact", "actions"];
@@ -204,18 +211,32 @@ fn pdf(objects: &[&str]) -> Vec<u8> {
     out
 }
 
-/// One page with text, an unsigned digital signature field (« Signature1 ») and a sticky note.
+/// The fixture's page size, in points (its MediaBox).
+const PAGE_SIZE: [f32; 2] = [300.0, 200.0];
+/// The fixture's picture, `[x0, y0, x1, y1]` in the page's user space (clear of its text, signature
+/// field and sticky note).
+const PICTURE: [f32; 4] = [180.0, 70.0, 280.0, 130.0];
+
+/// One page with text, an unsigned digital signature field (« Signature1 »), a sticky note and a
+/// picture (an Image XObject of 2 × 1 pixels drawn at [`PICTURE`], EVORA-COL-53).
 fn fixture() -> Vec<u8> {
-    let body = "BT /F1 14 Tf 20 150 Td (Atelier) Tj ET";
+    let [x0, y0, x1, y1] = PICTURE;
+    let body = format!("BT /F1 14 Tf 20 150 Td (Atelier) Tj ET q {} 0 0 {} {x0} {y0} cm /Im1 Do Q", x1 - x0, y1 - y0);
     let contents = format!("<< /Length {} >>\nstream\n{body}\nendstream", body.len());
+    let pixels = "AAABBB";
+    let picture = format!(
+        "<< /Type /XObject /Subtype /Image /Width 2 /Height 1 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Length {} >>\nstream\n{pixels}\nendstream",
+        pixels.len()
+    );
     pdf(&[
         "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R] /SigFlags 1 >> >>",
         "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 300 200] >>",
-        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Font << /F1 6 0 R >> >> /Annots [5 0 R 7 0 R] >>",
+        "<< /Type /Page /Parent 2 0 R /Contents 4 0 R /Resources << /Font << /F1 6 0 R >> /XObject << /Im1 8 0 R >> >> /Annots [5 0 R 7 0 R] >>",
         contents.as_str(),
         "<< /Type /Annot /Subtype /Widget /FT /Sig /T (Signature1) /Rect [20 20 160 60] /P 3 0 R /F 4 >>",
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
         "<< /Type /Annot /Subtype /Text /Rect [250 170 270 190] /T (Tester) /Contents (Check the numbers) /P 3 0 R >>",
+        picture.as_str(),
     ])
 }
 
@@ -232,6 +253,42 @@ fn harness(document: bool, setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Ha
     // Fonts install on frame 1 and apply on frame 2.
     h.run_steps(4);
     h
+}
+
+/// EVORA-COL-53: the fixture opened straight into the Edit workspace, which goes through the same
+/// `enter_mode` as the mode bar (`default_mode`, applied on open), in a tall window so that a
+/// picture's whole right-click menu is on screen.
+fn edit_workspace() -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 1500.0)).build_eframe(|_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.default_mode = Mode::Edit;
+        app.open_bytes("atelier.pdf", None, fixture()).expect("the fixture opens");
+        app
+    });
+    h.run_steps(4);
+    h
+}
+
+/// AccessKit nodes and painted texts whose label is exactly `label`.
+fn shown(h: &Harness<'static, PdfCraftApp>, label: &str) -> usize {
+    nodes(h, label) + painted_exact(h, label)
+}
+
+/// A right-click on the centre of the fixture's picture (page 1), as a member does.
+fn right_click_picture(h: &mut Harness<'static, PdfCraftApp>) {
+    let Some(page) = h.state().active.and_then(|i| h.state().views.get(i)).and_then(|v| v.page_screen_rect(0)) else {
+        return;
+    };
+    let [x0, y0, x1, y1] = PICTURE;
+    let [w, ht] = PAGE_SIZE;
+    let at = egui::pos2(page.left() + (x0 + x1) / 2.0 / w * page.width(), page.top() + (ht - (y0 + y1) / 2.0) / ht * page.height());
+    h.hover_at(at);
+    h.run_steps(1);
+    for pressed in [true, false] {
+        h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Secondary, pressed, modifiers: Default::default() });
+    }
+    h.run_steps(3);
 }
 
 /// Back to a calm state between checks: no dialog, palette or page tool.
@@ -491,14 +548,17 @@ fn the_atelier_scope_q47_a_is_respected() {
     palette_group(&mut v, &mut h, "actions", false);
     palette_group(&mut v, &mut h, "accessibility", true);
     tool_panel(&mut h, "edit");
-    v.absent(&h, "panneau « Edit a PDF »", "Edit text & images");
+    // EVORA-COL-53: its « Other options » link no hidden tool group (twin: a kept group).
+    v.absent(&h, "panneau « Edit a PDF »", group_label("redact"));
+    v.present(&h, "panneau « Edit a PDF »", group_label("combine"));
     v.present(&h, "panneau « Edit a PDF »", "Header and footer");
-    // EVORA-COL-38: the Edit workspace's quick bar (v0.14.0). Witness: its Select button is drawn.
+    // EVORA-COL-38, EVORA-COL-53: the Edit workspace's quick bar (v0.14.0) offers Edit text & images.
+    // Witness: its Select button is drawn.
     calm(&mut h);
     let mode = h.state().mode;
     h.state_mut().mode = Mode::Edit;
     h.run_steps(3);
-    v.absent(&h, "barre d'outils de l'espace Edit", "Edit text & images");
+    v.present(&h, "barre d'outils de l'espace Edit", "Edit text & images");
     v.present(&h, "barre d'outils de l'espace Edit", "Select (V)");
     h.state_mut().mode = mode;
     h.run_steps(2);
@@ -541,9 +601,9 @@ fn the_atelier_scope_q47_a_is_respected() {
     v.present(&h, "panneau Commentaires, menu", "Export all to data file…");
     v.absent(&h, "panneau Commentaires, menu", "Import comments…");
     let dialogs = [Dialog::JsConsole, Dialog::Sanitize, Dialog::RemoveHidden, Dialog::ActionWizard];
-    let tools = [QuickTool::EditText, QuickTool::EnhanceCamera];
+    let tools = [QuickTool::EnhanceCamera];
     running_leaves_nothing(&mut v, &mut h, SCOPE, &dialogs, &tools);
-    for (key, value) in [("quick", "edit-text"), ("quick", "enhance-camera"), ("dialog", "js-console"), ("dialog", "action-wizard")] {
+    for (key, value) in [("quick", "enhance-camera"), ("dialog", "js-console"), ("dialog", "action-wizard")] {
         calm(&mut h);
         let _ = h.state_mut().set_option(key, value);
         h.run_steps(3);
@@ -553,6 +613,22 @@ fn the_atelier_scope_q47_a_is_respected() {
         });
     }
     forced_state_closes(&mut v, &mut h, &dialogs, &tools);
+    // EVORA-COL-53: entering Edit turns Edit text & images on, and it stays on; the right-click menu
+    // of a picture then keeps its redaction and OCR items out. A fresh harness: no state left by the
+    // checks above (some stay open under the CI witness that cuts `enforce`).
+    let mut edit = edit_workspace();
+    let (mode, tool) = (edit.state().mode, edit.state().quick_tool);
+    v.holds(mode == Mode::Edit && tool == QuickTool::EditText, || {
+        format!("entrée dans l'espace Edit : mode {mode:?}, outil {tool:?} (attendus : Edit, EditText)")
+    });
+    let deletes = shown(&edit, "Delete");
+    right_click_picture(&mut edit);
+    let menu = "menu de l'image (espace Edit, clic droit)";
+    v.present(&edit, menu, "Save Image As…");
+    let deletes_now = shown(&edit, "Delete");
+    v.holds(deletes_now > deletes, || format!("{menu} : témoin « Delete » absent ({deletes} avant le clic droit, {deletes_now} après)"));
+    v.absent(&edit, menu, "Redact Image");
+    v.absent(&edit, menu, "Recognize Text…");
     v.finish();
 }
 
@@ -599,7 +675,9 @@ fn the_expanded_all_tools_view_offers_nothing_hidden() {
 fn kept_neighbours_stay_reachable() {
     let mut v = Verdict::new("temoins");
     let mut h = harness(true, |_| {});
-    for label in ["Validate all signatures", "Signatures panel", "Fill & Sign: sign", "Document JavaScripts…", "Add text", "Reduce file size…"] {
+    for label in
+        ["Validate all signatures", "Signatures panel", "Fill & Sign: sign", "Document JavaScripts…", "Add text", "Edit text & images", "Reduce file size…"]
+    {
         palette_for(&mut h, label);
         let n = nodes(&h, label);
         v.holds(n > 0, || format!("palette « {label} » : témoin absent"));
@@ -620,6 +698,12 @@ fn kept_neighbours_stay_reachable() {
     h.run_steps(3);
     let tool = h.state().quick_tool;
     v.holds(tool == QuickTool::AddText, || format!("outil Add text : remplacé par {tool:?}, garde trop large"));
+    // EVORA-COL-53: Edit text & images, offered, stays on as a page tool.
+    calm(&mut h);
+    h.state_mut().quick_tool = QuickTool::EditText;
+    h.run_steps(3);
+    let tool = h.state().quick_tool;
+    v.holds(tool == QuickTool::EditText, || format!("outil Edit text & images : remplacé par {tool:?}, garde trop large"));
     tool_panel(&mut h, "certificate");
     let left = h.state().left;
     v.holds(left == LeftPanel::Tool("certificate"), || format!("--tool certificate : panneau {left:?}, garde trop large"));
