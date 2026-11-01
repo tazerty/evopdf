@@ -405,8 +405,7 @@ fn edit_panel(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens, g: &'static 
         widgets::section_title(ui, tl!("Other options"));
         // Evora (COL-10, D-9; EVORA-COL-53): a tool group whose items are all hidden (Redact a PDF) is
         // not linked from here, as All tools leaves it out.
-        // SABORDAGE QA (EVORA-COL-56) S2c: filter removed, to be restored by the next commit.
-        for other in EDIT_OTHER_TOOLS.iter().filter_map(|id| catalog::group(id)) {
+        for other in EDIT_OTHER_TOOLS.iter().filter_map(|id| catalog::group(id)).filter(|g| crate::evora::tool_allowed(g.id)) {
             if edit_row(ui, t, other.icon, tl!(other.label), other.availability).clicked() {
                 tool = Some(other.id);
             }

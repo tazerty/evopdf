@@ -1141,8 +1141,7 @@ fn image_menu(
     ui.separator();
     // Evora (COL-10, D-9; EVORA-COL-53): no redaction mark from here while redaction is hidden, since
     // Colophon's server tool redacts. This item is the only source of ImageAction::Redact.
-    // SABORDAGE QA (EVORA-COL-56) S2a: guard removed, to be restored by the next commit.
-    if ui.button(tl!("Redact Image")).clicked() {
+    if !crate::evora::hidden("redact.mark") && ui.button(tl!("Redact Image")).clicked() {
         *action = Some(ImageAction::Redact(page, hit));
         ui.close();
     }
@@ -1151,8 +1150,7 @@ fn image_menu(
         ui.close();
     }
     // Evora (OCR rule; EVORA-COL-53): Colophon's server OCR tool recognizes text, not this dialog.
-    // SABORDAGE QA (EVORA-COL-56) S2b: guard removed, to be restored by the next commit.
-    if ui.button(tl!("Recognize Text…")).clicked() {
+    if !crate::evora::hidden("ocr.recognize") && ui.button(tl!("Recognize Text…")).clicked() {
         *action = Some(ImageAction::Recognize(page));
         ui.close();
     }
