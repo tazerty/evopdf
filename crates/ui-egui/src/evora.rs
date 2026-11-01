@@ -13,9 +13,13 @@
 //!   job, and the guided actions that recognize text (Action Wizard steps) go with it.
 //! - Q47 (a), Evora's default hypothesis until it is decided: the Atelier does fine editing only.
 //!   The upstream automations, the engine's own recent files, XFDF and FDF imports, the JavaScript
-//!   console, the rest of the redaction family (sanitize, remove hidden information), the rest of the
-//!   Scan & OCR family (camera images) and editing existing text (until Evora Drive keeps versions,
-//!   F7) are hidden too.
+//!   console, the rest of the redaction family (sanitize, remove hidden information) and the rest of
+//!   the Scan & OCR family (camera images) are hidden too.
+//! - EVORA-COL-53: editing existing text and images (Edit text & images) is offered. Gabriel's order
+//!   of 2026-11-01 (« rendre les PDF entièrement éditables ») decides this part of Q47: its condition
+//!   is met, Evora Drive keeps versions (F7, lot DRV-4) and Colophon's workspace saves documents as
+//!   new Drive versions. The picture menu of that tool keeps its redaction and OCR items out
+//!   (`edit_text_ui::image_menu`), and the Edit panel links no hidden tool (`panels::edit_panel`).
 //!
 //! Hidden commands and catalogue items stay out of the menus, the command palette, the keyboard
 //! shortcuts list, the tool panels and Home, and do nothing if run another way; a tool group whose
@@ -72,8 +76,8 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     "protect.remove_hidden",
     // Q47 (a): the rest of the Scan & OCR family.
     "ocr.enhance_camera",
-    // Q47 (a): editing existing text, until Evora Drive keeps versions (F7).
-    "edit.edit_text",
+    // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
+    // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
 ];
 
 pub(crate) fn hidden(id: &str) -> bool {
@@ -128,6 +132,8 @@ fn tool_command(tool: &QuickTool) -> Option<&'static str> {
         QuickTool::SignArea { certify: true } => "sign.certify",
         QuickTool::Redact => "redact.mark",
         QuickTool::EnhanceCamera => "ocr.enhance_camera",
+        // Inert while "edit.edit_text" is offered (EVORA-COL-53); kept so that listing the id again in
+        // HIDDEN_COMMANDS hides the tool whole, as the CI witness of that lot does.
         QuickTool::EditText => "edit.edit_text",
         _ => return None,
     })

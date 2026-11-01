@@ -1139,7 +1139,9 @@ fn image_menu(
         ui.close();
     }
     ui.separator();
-    if ui.button(tl!("Redact Image")).clicked() {
+    // Evora (COL-10, D-9; EVORA-COL-53): no redaction mark from here while redaction is hidden, since
+    // Colophon's server tool redacts. This item is the only source of ImageAction::Redact.
+    if !crate::evora::hidden("redact.mark") && ui.button(tl!("Redact Image")).clicked() {
         *action = Some(ImageAction::Redact(page, hit));
         ui.close();
     }
@@ -1147,7 +1149,8 @@ fn image_menu(
         *action = Some(ImageAction::Link(page, hit));
         ui.close();
     }
-    if ui.button(tl!("Recognize Text…")).clicked() {
+    // Evora (OCR rule; EVORA-COL-53): Colophon's server OCR tool recognizes text, not this dialog.
+    if !crate::evora::hidden("ocr.recognize") && ui.button(tl!("Recognize Text…")).clicked() {
         *action = Some(ImageAction::Recognize(page));
         ui.close();
     }
