@@ -291,7 +291,7 @@ fn style_and_colour_from_the_bookmark_menu() {
         h.get_by_label("Intro").click_secondary();
         h.run_steps(2);
         // A submenu's button carries its arrow.
-        h.get_by_label(&format!("{menu} ⏵")).click();
+        h.get_by_label(&format!("{menu} ›")).click();
         h.run_steps(2);
         h.get_by_label(item).click();
         h.run_steps(3);

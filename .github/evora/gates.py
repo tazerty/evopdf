@@ -643,7 +643,8 @@ MASK_WITNESSES = {
         "title": "filtre des groupes de la palette (groupes masqués rouverts)",
         "prefixes": ("groupe de palette ",),
         "red": ("caviardage", "ocr", "perimetre-q47"),
-        "groups": {"caviardage": ["redact"], "ocr": ["actions", "scan"], "perimetre-q47": ["actions"]},
+        # EVORA-COL-58 (F6) : « Use JavaScript » et « AI assistant » rejoignent les groupes masqués de perimetre-q47.
+        "groups": {"caviardage": ["redact"], "ocr": ["actions", "scan"], "perimetre-q47": ["actions", "ai", "javascript"]},
     },
 }
 # « vue-outils » (EVORA-COL-38) : vue « All tools » étendue de v0.14.0 ; verte sous les deux témoins.

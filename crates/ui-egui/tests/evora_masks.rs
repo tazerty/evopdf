@@ -32,6 +32,12 @@
 //! redaction mark) nor « Recognize Text… » (the engine's OCR), beside its twin witnesses « Save Image
 //! As… » and « Delete » (a menu that isn't drawn can't pass for a mask); the Edit panel links no
 //! hidden tool. Family « temoins » keeps the tool reachable from the palette and as a page tool.
+//!
+//! EVORA-COL-58 (F6): the « AI assistant » tool (a model the member would bring himself, outside
+//! Evora's AI service, repository rule 6) and the rest of the « Use JavaScript » tool (document
+//! scripts and actions, whose added scripts Colophon refuses on save) are hidden: both groups join the
+//! hidden ones (no tile, no palette group, no panel, no item found), beside the kept group of their
+//! category, « Add search index » (twin). Tools ▸ Document JavaScripts… stays (witness of « temoins »).
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -49,6 +55,7 @@ const OCR: &[&str] = &["ocr.recognize", "ocr.recognize_batch", "ocr.enhance", "o
 /// Q47 (a), default hypothesis: upstream automations, the engine's recent files, XFDF and FDF
 /// imports, the JavaScript console, the rest of the redaction and Scan & OCR families. Editing
 /// existing text and images is offered since EVORA-COL-53 (Gabriel's order of 2026-11-01, F7 met).
+/// EVORA-COL-58 (F6): the AI assistant's items and the rest of the « Use JavaScript » tool.
 const SCOPE: &[&str] = &[
     "actions.distribution",
     "actions.make_accessible",
@@ -63,9 +70,14 @@ const SCOPE: &[&str] = &[
     "redact.sanitize",
     "protect.remove_hidden",
     "ocr.enhance_camera",
+    "ai.summary",
+    "ai.ask",
+    "ai.translate",
+    "js.document",
+    "js.actions",
 ];
 /// Tool groups whose items are all hidden: they must disappear.
-const HIDDEN_GROUPS: &[&str] = &["scan", "redact", "actions"];
+const HIDDEN_GROUPS: &[&str] = &["scan", "redact", "actions", "javascript", "ai"];
 /// Commands that open a native file picker (they can't run headless, see `tests/commands.rs`).
 const PICKERS: &[&str] = &["ocr.recognize_batch", "file.pin_folder", "comment.import", "form.import_data", "file.open_recent"];
 
@@ -543,9 +555,14 @@ fn the_atelier_scope_q47_a_is_respected() {
     let mut h = harness(true, |_| {});
     all_tools(&mut h);
     v.absent(&h, "All tools", group_label("actions"));
-    v.present(&h, "All tools", group_label("javascript"));
+    // EVORA-COL-58 (F6): neither tool, beside the kept tool of their category (twin).
+    v.absent(&h, "All tools", group_label("javascript"));
+    v.absent(&h, "All tools", group_label("ai"));
+    v.present(&h, "All tools", group_label("search_index"));
     palette_offers_none(&mut v, &mut h, SCOPE);
     palette_group(&mut v, &mut h, "actions", false);
+    palette_group(&mut v, &mut h, "javascript", false);
+    palette_group(&mut v, &mut h, "ai", false);
     palette_group(&mut v, &mut h, "accessibility", true);
     tool_panel(&mut h, "edit");
     // EVORA-COL-53: its « Other options » link no hidden tool group (twin: a kept group).
@@ -568,16 +585,23 @@ fn the_atelier_scope_q47_a_is_respected() {
     tool_panel(&mut h, "protect");
     v.absent(&h, "panneau « Protect a PDF »", "Remove hidden information");
     v.present(&h, "panneau « Protect a PDF »", "Protect with password");
-    tool_panel(&mut h, "javascript");
-    v.absent(&h, "panneau « Use JavaScript »", "Console");
-    v.present(&h, "panneau « Use JavaScript »", "Document JavaScripts");
+    // EVORA-COL-58 (F6): neither tool's panel opens; the kept tool of their category does (twin).
+    for g in ["javascript", "ai"] {
+        tool_panel(&mut h, g);
+        let left = h.state().left;
+        v.holds(left != LeftPanel::Tool(g), || format!("--tool {g} : panneau {left:?} ouvert"));
+    }
+    tool_panel(&mut h, "search_index");
+    let left = h.state().left;
+    v.holds(left == LeftPanel::Tool("search_index"), || format!("--tool search_index : témoin, panneau {left:?}"));
+    v.present(&h, "panneau « Add search index »", "Manage embedded index");
     // The File menu.
     calm(&mut h);
     if let Some(menu) = h.query_all_by_label("Menu").next() {
         menu.click();
     }
     h.run_steps(2);
-    if let Some(file) = h.query_all_by_label("File ⏵").next() {
+    if let Some(file) = h.query_all_by_label("File ›").next() {
         file.hover();
     }
     h.run_steps(3);
@@ -649,7 +673,7 @@ fn the_expanded_all_tools_view_offers_nothing_hidden() {
     for g in HIDDEN_GROUPS {
         v.absent(&h, "vue « All tools »", group_label(g));
     }
-    for g in ["certificate", "fill_sign", "protect", "edit", "form", "javascript", "compress"] {
+    for g in ["certificate", "fill_sign", "protect", "edit", "form", "search_index", "compress"] {
         v.present(&h, "vue « All tools »", group_label(g));
     }
     for id in SIGNATURE.iter().chain(REDACTION).chain(OCR).chain(SCOPE) {
@@ -683,7 +707,7 @@ fn kept_neighbours_stay_reachable() {
         v.holds(n > 0, || format!("palette « {label} » : témoin absent"));
     }
     all_tools(&mut h);
-    for g in ["certificate", "fill_sign", "protect", "edit", "form", "javascript", "export", "compress"] {
+    for g in ["certificate", "fill_sign", "protect", "edit", "form", "search_index", "export", "compress"] {
         v.present(&h, "All tools", group_label(g));
     }
     for (d, what) in [(Dialog::Preferences, "Préférences"), (Dialog::Shortcuts, "raccourcis clavier")] {

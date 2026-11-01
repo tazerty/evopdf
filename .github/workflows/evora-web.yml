@@ -540,7 +540,8 @@ jobs:
           # EVORA-COL-32 : la même recette, compilée avec la fonctionnalité CI evora-witness-palette-groups
           # (jamais dans le build web : la palette liste tous les groupes du catalogue, comme l'amont), doit
           # échouer par les seuls contrôles « groupe de palette » des groupes masqués (caviardage : redact ;
-          # ocr : scan et actions ; perimetre-q47 : actions), aux mêmes inventaires, les jumeaux restant verts.
+          # ocr : scan et actions ; perimetre-q47 : actions, ai et javascript depuis EVORA-COL-58), aux mêmes
+          # inventaires, les jumeaux restant verts.
           set +e
           set -uo pipefail
           cargo test --locked --offline -p pdfcraft-ui-egui --features evora-witness-palette-groups --test evora_masks \
@@ -553,3 +554,21 @@ jobs:
             exit 1
           fi
           python3 -I .github/evora/gates.py masks-witness "$RUNNER_TEMP/masques.log" "$RUNNER_TEMP/temoin-palette.log" palette-groups
+
+      - name: Reprise automatique pendant la saisie, glyphes du menu principal (bloquante)
+        if: ${{ !cancelled() }}
+        env:
+          RUST_BACKTRACE: "0"
+          CARGO_PROFILE_DEV_DEBUG: "0"
+          # Les polices de l'interface seules, comme dans le build web : aucune police du système en repli.
+          PDFCRAFT_SYSTEM_FONTS: "0"
+        run: |
+          # EVORA-COL-58 : F4, une reprise automatique d'Evora (evora:request-save, raison autosave) arrivée
+          # pendant une saisie répond « busy » sans rien valider, et la frappe qui suit va au texte, l'outil
+          # inchangé (témoins : l'enregistrement demandé valide et enregistre, rien à enregistrer répond
+          # « clean », hors saisie la reprise enregistre) ; F5, le menu principal ouvert ne dessine aucun
+          # caractère absent des polices de l'interface (témoin : ses sous-menus dessinés). Lancée même
+          # après une recette des masquages rouge, pour que chaque témoin sabordé se lise en entier.
+          set -euo pipefail
+          cargo test --locked --offline -p pdfcraft-ui-egui --test evora_finitions -- --test-threads=1 --nocapture 2>&1 \
+            | tee "$RUNNER_TEMP/finitions.log"

@@ -454,7 +454,7 @@ fn language_switch_preserves_document_and_command_ids() {
         let lang = i18n::Lang::from_code(code).unwrap();
         h.get_by_label(i18n::tr(lang, "Menu")).click();
         h.run_steps(2);
-        h.get_by_label(&format!("{} ⏵", i18n::tr(lang, "File"))).hover();
+        h.get_by_label(&format!("{} ›", i18n::tr(lang, "File"))).hover();
         h.run_steps(3);
         h.get_by_label_contains(i18n::tr(lang, "Open…"));
         ok(&mut h, &c, "ui.key", json!({ "key": "Escape" }));
@@ -940,7 +940,7 @@ fn preferences_menu_and_shortcut_allow_switching_interface_languages() {
     let (mut h, c) = harness();
     ok(&mut h, &c, "ui.set", json!({ "key": "language", "value": "ja" }));
     ok(&mut h, &c, "ui.click", json!({ "label": "メニュー" }));
-    ok(&mut h, &c, "ui.click", json!({ "label": "編集 ⏵" }));
+    ok(&mut h, &c, "ui.click", json!({ "label": "編集 ›" }));
     let menu = ok(&mut h, &c, "ui.inspect", json!({ "query": "環境設定…" }));
     let prefs = menu["widgets"].as_array().unwrap().iter().find(|w| w["clickable"] == true).expect("Preferences menu item");
     ok(&mut h, &c, "ui.click", json!({ "id": prefs["id"] }));

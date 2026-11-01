@@ -199,7 +199,7 @@ fn selected_text_copy_edit_and_context_menus() {
     h.run_steps(2); // Hide floating Copy so this test can only reach menu entries.
     h.get_by_label("Menu").click();
     h.run_steps(2);
-    h.get_by_label("Edit ⏵").hover();
+    h.get_by_label("Edit ›").hover();
     h.run_steps(3);
     h.get_by_label_contains("Copy").click();
     let mut did_copy = false;

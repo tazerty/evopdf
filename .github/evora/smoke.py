@@ -63,7 +63,15 @@ Scénarios, chacun sur un profil Chrome vierge (démarrage à froid) :
      [fin-destructive]. Ces deux détecteurs, et eux seuls, rougissent sous le témoin de la correction
      (FIN_FIX_EXPECTED). EVORA-COL-53 (commande de Gabriel du 2026-11-01, Q47 tranchée pour l'édition du texte
      existant et des images, Drive F7 en place) : « edit.edit_text » quitte les commandes masquées et devient un
-     témoin du catalogue, non destructif (il choisit un outil) [fin-catalogue].
+     témoin du catalogue, non destructif (il choisit un outil) [fin-catalogue]. EVORA-COL-58 : l'empreinte du
+     catalogue suit la norme d'Evora (identifiant, puis « ! » si destructive, sinon saut de ligne), recalculée ici et
+     ancrée par deux empreintes connues calculées par Evora (FIN_HASH_KNOWN) [fin-catalogue].
+ 14. « sous-menus » (EVORA-COL-58) : au rendu, par des clics synthétiques aux positions que l'audit relève
+     (window.__evoraAudit.positions) : la vue « All tools » étendue (« View more ») ne dessine ni « Use JavaScript »
+     ni « AI assistant » [outils-masques], témoin « Add search index » dessiné [outils-temoin] (F6) ; le menu
+     principal ouvert (« Menu ») ne dessine aucun caractère absent des polices de l'interface (audit des glyphes,
+     window.__evoraAudit.missing_now), ni la flèche d'egui U+23F5 [menu-glyphe], témoin ses sous-menus dessinés
+     (« Help ») [menu-temoin] (F5).
 
 Le témoin « pont-ehp-temoin » (scénario 6) cache aussi au moteur, depuis EVORA-COL-39, les clés qu'il croit
 avoir effacées (length, key()) : sa vérification passe, il ne refuse donc pas evora:init, et le banc garde
@@ -153,6 +161,14 @@ ENGINE_QUERY = os.environ.get("EVORA_SMOKE_QUERY", "")
 # Écrits ici, indépendamment de crates/ui-egui/src/evora.rs.
 MASKED_PROBES = ["Scan & OCR", "Redact a PDF", "Remove hidden information"]
 KEPT_PROBES = ["Export a PDF", "Protect a PDF", "Protect with password"]
+# Scénario « sous-menus » (EVORA-COL-58) : flèche des sous-menus dessinée par le moteur (U+203A, dans Inter) et celle
+# d'egui (U+23F5, absente des polices de l'interface depuis E10) ; groupes d'outils masqués (F6) et groupe gardé de
+# leur catégorie (témoin), écrits ici indépendamment de crates/ui-egui/src/evora.rs ; sondes du rendu.
+MENU_ARROW = "\u203a"
+MENU_ARROW_EGUI = "\u23f5"
+MENU_HIDDEN_TOOLS = ["Use JavaScript", "AI assistant"]
+MENU_KEPT_TOOL = "Add search index"
+MENU_PROBES = ["Menu", "View more", "Help", MENU_ARROW, MENU_ARROW_EGUI, *MENU_HIDDEN_TOOLS, MENU_KEPT_TOOL]
 READY_TIMEOUT = 180.0
 ERROR_GRACE = 30.0
 SETTLE = 4.0
@@ -793,6 +809,8 @@ def run_scenario(name, site, csp, out_dir, chrome_bin, query=ENGINE_QUERY, expec
                 run_finitions(chrome, page, contexts, result, errors)
             elif expect.get("accuse"):
                 run_accuse(chrome, page, (sess, ctx), contexts, result, errors, expect.get("sabotage", ""))
+            elif expect.get("menus"):
+                run_menus(chrome, (sess, ctx), result, errors)
             elif host:
                 run_ehp(chrome, page, (sess, ctx), contexts, result, errors, expect.get("sabotage", ""))
             gl = chrome.call("Runtime.evaluate", {"expression": GL_PROBE, "contextId": ctx, "returnByValue": True}, sess)
@@ -2470,14 +2488,27 @@ addEventListener("message", (e) => {{
 
 
 def fin_hash(commands):
-    """Empreinte du catalogue (§9.1) recalculée ici : FNV-1a 64 de chaque identifiant, d'un octet nul et de son
-    drapeau destructif (« 1 » ou « 0 »), et d'un saut de ligne, dans l'ordre du catalogue."""
+    """Empreinte du catalogue (§9.1) recalculée ici selon la norme d'Evora (EVORA-COL-58, celle de
+    CommandCatalog::fingerprint de bin/creative-provision.php, que le provisionnement et la coquille appliquent) :
+    FNV-1a 64 de chaque identifiant suivi de « ! » si la commande est destructive, sinon d'un saut de ligne, dans
+    l'ordre du catalogue. L'ancienne formule du pont (identifiant, octet nul, « 1 » ou « 0 », saut de ligne) faisait
+    refuser le catalogue par le provisionnement d'Evora : aucun catalogue servi."""
     h = 0xCBF29CE484222325
     for c in commands:
-        flag = b"1" if isinstance(c, dict) and c.get("destructive") is True else b"0"
-        for byte in str(c.get("id") if isinstance(c, dict) else "").encode() + b"\x00" + flag + b"\n":
+        tail = b"!" if isinstance(c, dict) and c.get("destructive") is True else b"\n"
+        for byte in str(c.get("id") if isinstance(c, dict) else "").encode() + tail:
             h = ((h ^ byte) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
     return f"{h:016x}"
+
+
+# EVORA-COL-58 : empreintes connues, calculées par CommandCatalog::fingerprint d'Evora (PHP) sur ces catalogues :
+# l'empreinte de la fumée ne se juge pas sur elle-même (deux implémentations indépendantes doivent s'accorder).
+FIN_HASH_KNOWN = (
+    ([("page.rotate", False), ("page.delete", True)], "28f6d06a6d561540"),
+    ([("page.rotate", False), ("page.delete", True), ("form.clear", True), ("comment.flatten", True),
+      ("export.docx", False), ("export.html", False), ("comment.export", False), ("edit.undo", False),
+      ("print.dialog", False), ("edit.edit_text", False)], "6f846b1ea96e70ed"),
+)
 
 
 def judge_catalog(p, lang):
@@ -2549,7 +2580,9 @@ def fin_selftest():
              dict(sane, commands=masked, count=len(masked), hash=fin_hash(masked)),
              dict(sane, commands=flat, count=len(flat), hash=fin_hash(flat)),
              dict(sane, hash="0" * 16), dict(sane, count=1), dict(sane, lang="de"), dict(sane, params={"type": "object"})]
-    return judge_catalog(sane, "fr") == [] and all(judge_catalog(c, "fr") for c in cases) and judge_catalog(None, "fr")
+    known = all(fin_hash([{"id": i, "destructive": d} for i, d in rows]) == want for rows, want in FIN_HASH_KNOWN)
+    return known and judge_catalog(sane, "fr") == [] and all(judge_catalog(c, "fr") for c in cases) \
+        and judge_catalog(None, "fr")
 
 
 def removal_marked(c):
@@ -2877,6 +2910,76 @@ def error_tags(errors):
     return {m.group(1) for m in (re.match(r"^\[([^\]]+)\]", e) for e in errors) if m}
 
 
+# Événement de pointeur synthétique dans le document moteur, au point (x, y) en pixels CSS du cadre : ceux que le
+# lanceur web d'eframe écoute sur le canvas (survol, appui et relâchement du bouton principal).
+MENU_POINTER = """((x, y, type, buttons) => { const c = document.getElementById("pdfcraft");
+  const o = {clientX: x, clientY: y, bubbles: true, cancelable: true, composed: true, button: 0, buttons: buttons,
+             pointerId: 1, pointerType: "mouse", isPrimary: true};
+  c.dispatchEvent(type === "mousemove" ? new MouseEvent(type, o) : new PointerEvent(type, o));
+  return true; })(%(x)s, %(y)s, "%(type)s", %(buttons)s)"""
+
+
+def run_menus(chrome, engine, result, errors):
+    """EVORA-COL-58 : F6 (outils masqués de la vue « All tools » étendue) et F5 (flèches des sous-menus du menu
+    principal) au rendu, par des clics aux positions que l'audit relève ; un détecteur et un témoin par finition."""
+    sess, ctx = engine
+    menus = result.setdefault("menus", {})
+
+    def audit():
+        return json.loads(cdp_evaluate(chrome, "JSON.stringify(window.__evoraAudit || null)", sess, ctx) or "null") or {}
+
+    def pause(seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            chrome.pump(0.05)
+
+    def now(a, probe):
+        return int((a.get("exact_now") or {}).get(probe) or 0)
+
+    def click(label):
+        at = (audit().get("positions") or {}).get(label)
+        if not (isinstance(at, list) and len(at) == 2 and 0 <= at[0] <= IFRAME_W and 0 <= at[1] <= IFRAME_H):
+            errors.append(f"[banc] « {label} » non dessiné dans le cadre du moteur (position {at!r}) : clic impossible")
+            return False
+        x, y = round(at[0], 1), round(at[1], 1)
+        menus.setdefault("clics", []).append({"cible": label, "x": x, "y": y})
+        for kind, buttons, wait in (("mousemove", 0, 0.4), ("pointerdown", 1, 0.15), ("pointerup", 0, 1.5)):
+            cdp_evaluate(chrome, MENU_POINTER % {"x": x, "y": y, "type": kind, "buttons": buttons}, sess, ctx, gesture=True)
+            pause(wait)
+        return True
+
+    a0 = audit()
+    if a0.get("glyph_selftest") is not True:
+        errors.append(f"[banc] détecteur de glyphes muet (glyph_selftest {a0.get('glyph_selftest')!r})")
+    menus["glyphes_absents_au_demarrage"] = a0.get("missing_now")
+    # F6 : la vue « All tools » étendue ; les outils masqués ne doivent jamais avoir été dessinés.
+    if click("View more"):
+        a1 = audit()
+        drawn = {p: int((a1.get("probes") or {}).get(p) or 0) for p in MENU_HIDDEN_TOOLS}
+        kept0, kept1 = now(a0, MENU_KEPT_TOOL), now(a1, MENU_KEPT_TOOL)
+        menus["outils"] = {"masques_dessines": drawn, "temoin": [kept0, kept1]}
+        if kept1 <= kept0:
+            errors.append(f"[outils-temoin] vue « All tools » non étendue : « {MENU_KEPT_TOOL} » {kept0} → {kept1} "
+                          "(mesure impossible)")
+        elif any(drawn.values()):
+            errors.append(f"[outils-masques] outils masqués dessinés dans la vue « All tools » étendue (fois) : {drawn}")
+    # F5 : le menu principal, ses sous-menus et leurs flèches.
+    before = audit()
+    if click("Menu"):
+        after = audit()
+        new = sorted(set(after.get("missing_now") or []) - set(before.get("missing_now") or []))
+        help0, help1 = now(before, "Help"), now(after, "Help")
+        arrows, egui_arrows = now(after, MENU_ARROW), now(after, MENU_ARROW_EGUI)
+        menus["sous_menus"] = {"Help": [help0, help1], "fleche": arrows, "fleche_egui": egui_arrows,
+                               "glyphes_absents": after.get("missing_now"), "neufs": new}
+        if help1 <= help0:
+            errors.append(f"[menu-temoin] menu principal non ouvert : « Help » {help0} → {help1} (mesure impossible)")
+        elif new or egui_arrows:
+            errors.append(f"[menu-glyphe] menu principal ouvert : caractères sans glyphe dans les polices de l'interface "
+                          f"{new} (dessinés « ? »), flèche d'egui U+23F5 dessinée {egui_arrows} fois "
+                          f"(flèche du moteur U+203A : {arrows})")
+
+
 def mark_witness(witness, expected, description):
     """Un témoin sabordé est VALIDE s'il est rouge, et rouge par les seuls détecteurs `expected`."""
     tags = error_tags(witness["errors"])
@@ -2962,6 +3065,11 @@ def main(argv):
                        + urllib.parse.quote("|".join(MASKED_PROBES + KEPT_PROBES), safe=""))
         results.append(run_scenario("masquages", site, engine_csp(hashes), out_dir, chrome_bin, masks_query,
                                     {"masks": True, "dark": False}))
+        # EVORA-COL-58 : F6 (vue « All tools » étendue) et F5 (sous-menus du menu principal) au rendu, par des clics.
+        menus_query = (f"{ENGINE_QUERY}{sep}evora-probe="
+                       + urllib.parse.quote("|".join(MENU_PROBES), safe=""))
+        results.append(run_scenario("sous-menus", site, engine_csp(hashes), out_dir, chrome_bin, menus_query,
+                                    {"menus": True, "dark": False}))
     with open(os.path.join(out_dir, "smoke.json"), "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2, ensure_ascii=False)
 
@@ -3014,6 +3122,9 @@ def main(argv):
             if "masks" in r:
                 log(f"- {r['scenario']} : masquages au rendu (textes dessinés qui contiennent chaque sonde) : "
                     + json.dumps(r["masks"], ensure_ascii=False))
+            if "menus" in r:
+                log(f"- {r['scenario']} : sous-menus et vue « All tools » étendue (EVORA-COL-58) : "
+                    + json.dumps(r["menus"], ensure_ascii=False)[:2400])
             if "accuse" in r:
                 log(f"- {r['scenario']} : demande d'enregistrement et accusé (COL-08, COL-09) : "
                     + json.dumps({k: v for k, v in r["accuse"].items() if k != "messages"}, ensure_ascii=False)[:2400])
