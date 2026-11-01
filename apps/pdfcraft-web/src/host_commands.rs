@@ -133,7 +133,9 @@ pub fn catalog(app: &PdfCraftApp) -> (Vec<Entry>, &'static str, String) {
         }
         let destructive = DESTRUCTIVE.contains(&id);
         hash = fnv1a(hash, id.as_bytes());
-        hash = fnv1a(hash, if destructive { b"!" } else { b"\n" });
+        // SABORDAGE QA (EVORA-COL-61) S4 : ancienne formule de l'empreinte (à retirer par le commit suivant).
+        hash = fnv1a(hash, if destructive { b"\x001" } else { b"\x000" });
+        hash = fnv1a(hash, b"\n");
         let path = menu.map(|m| bounded(&m, id));
         entries.push(Entry { id, label: bounded(&label, id), path, enabled, destructive });
     }
