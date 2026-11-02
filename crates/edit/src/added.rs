@@ -241,7 +241,9 @@ fn norm(r: [f64; 4]) -> [f64; 4] {
 /// The advance of `s` in the item's standard font: its glyphs' widths and the character spacing
 /// after each of them, as `Tc` moves the pen (ISO 32000-2 §9.3.2).
 fn latin_width(t: &AddedText, s: &str) -> f64 {
-    t.family.width(s, t.size, t.bold, t.italic) + t.char_spacing * s.chars().count() as f64
+    // Evora (EVORA-COL-63, D3-d): an item written with Inter is measured with Inter.
+    let glyphs = if evora_inter::in_inter(t) { pdfcraft_fonts::inter_width(s, t.size) } else { t.family.width(s, t.size, t.bold, t.italic) };
+    glyphs + t.char_spacing * s.chars().count() as f64
 }
 
 /// The lines of a text item after wrapping to its box width.
@@ -349,12 +351,21 @@ fn is_hebrew(c: char) -> bool {
 /// draw (or that has no face to draw it). Page-content tools refuse such text; the Add-text editor
 /// keeps it open.
 pub fn first_undrawable(t: &AddedText) -> Option<char> {
+    // Evora (EVORA-COL-63, D3-d): what Inter Regular covers is written with it, embedded.
+    if evora_inter::in_inter(t) {
+        return None;
+    }
+    standard_undrawable(t)
+}
+
+/// [`first_undrawable`] with the standard fonts and the craft-fonts faces only.
+fn standard_undrawable(t: &AddedText) -> Option<char> {
     if t.text.chars().any(is_thai) {
         if let Some(c) = t.text.chars().find(|c| is_thai(*c) && !pdfcraft_fonts::thai_has(*c)) {
             return Some(c);
         }
         let rest = AddedText { text: t.text.chars().filter(|c| !is_thai(*c)).collect(), ..t.clone() };
-        return first_undrawable(&rest);
+        return standard_undrawable(&rest);
     }
     // Arabic or Hebrew that nothing can draw: there's no face, or the face lacks it.
     if let Some(c) =
@@ -838,15 +849,17 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
         Content::Text(t) => {
             let base = t.family.base_font(t.bold, t.italic);
             let name = font_name(base);
-            let mut font = Dict::new();
-            font.set(b"Type".to_vec(), Object::name("Font"));
-            font.set(b"Subtype".to_vec(), Object::name("Type1"));
-            font.set(b"BaseFont".to_vec(), Object::name(base));
-            if t.family != Family::Courier || !t.text.is_ascii() {
-                font.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
-            }
             let mut fonts = Dict::new();
-            fonts.set(name.clone().into_bytes(), Object::Dict(font));
+            // Evora (EVORA-COL-63, D3-d): text the standard fonts can't draw and Inter can.
+            if evora_inter::in_inter(t) {
+                evora_inter::draw(doc, t, taken, &mut fonts, &mut out)?;
+                res.set(b"Font".to_vec(), Object::Dict(fonts));
+                out.extend_from_slice(b"Q\n");
+                return Ok((out, res));
+            }
+            // Evora (EVORA-COL-63): an indirect font, see `crate::standard_font`.
+            let encoded = t.family != Family::Courier || !t.text.is_ascii();
+            fonts.set(name.clone().into_bytes(), crate::standard_font(doc, taken.get(name.as_bytes()), base, encoded));
             let face_or_new = |has: fn(char) -> bool, face: bool| t.text.chars().any(has) && (face || !existing);
             if t.text.chars().any(is_thai)
                 || face_or_new(is_arabic, pdfcraft_fonts::document_arabic_font().is_some())
@@ -866,18 +879,7 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
             }
             let all = lines(t);
             for (i, line) in all.iter().enumerate() {
-                let w = latin_width(t, line);
-                let x = match t.align {
-                    Align::Left | Align::Justify => r[0],
-                    Align::Center => r[0] + ((r[2] - r[0]) - w) / 2.0,
-                    Align::Right => r[2] - w,
-                };
-                // Baseline: 0.8 em below the line top.
-                let y = r[3] - (i as f64 * 1.2 + 0.95) * t.size;
-                // Justified: word spacing makes every line but the last fill the box.
-                let spaces = line.matches(' ').count();
-                let tw =
-                    if t.align == Align::Justify && i + 1 < all.len() && spaces > 0 { ((r[2] - r[0]) - w).max(0.0) / spaces as f64 } else { 0.0 };
+                let (x, y, tw) = line_origin(t, r, &all, i);
                 out.extend(format!("1 0 0 1 {} {} Tm {} Tw ", n(x), n(y), n(tw)).bytes());
                 out.extend(literal(&win_ansi(line)));
                 out.extend_from_slice(b" Tj\n");
@@ -915,6 +917,24 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
     }
     out.extend_from_slice(b"Q\n");
     Ok((out, res))
+}
+
+/// Where line `i` of `all`, the lines of text item `t` in its box `r` ([`text_rect`]), starts: its
+/// left end, its baseline, and the word spacing that fills the box (justified lines but the last).
+fn line_origin(t: &AddedText, r: [f64; 4], all: &[String], i: usize) -> (f64, f64, f64) {
+    let line = all.get(i).map(String::as_str).unwrap_or_default();
+    let w = latin_width(t, line);
+    let x = match t.align {
+        Align::Left | Align::Justify => r[0],
+        Align::Center => r[0] + ((r[2] - r[0]) - w) / 2.0,
+        Align::Right => r[2] - w,
+    };
+    // Baseline: 0.8 em below the line top.
+    let y = r[3] - (i as f64 * 1.2 + 0.95) * t.size;
+    // Justified: word spacing makes every line but the last fill the box.
+    let spaces = line.matches(' ').count();
+    let tw = if t.align == Align::Justify && i + 1 < all.len() && spaces > 0 { ((r[2] - r[0]) - w).max(0.0) / spaces as f64 } else { 0.0 };
+    (x, y, tw)
 }
 
 fn params(c: &Content) -> Dict {
@@ -1246,3 +1266,6 @@ fn drop_fonts(doc: &Document, res: &mut Dict, names: &[Vec<u8>]) {
 
 #[cfg(test)]
 mod arabic_tests;
+
+/// Evora (EVORA-COL-63, D3-d): text written with Inter Regular, embedded.
+mod evora_inter;

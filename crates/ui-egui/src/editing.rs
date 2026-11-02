@@ -637,6 +637,10 @@ impl PdfCraftApp {
     pub fn has_unsaved_work(&self, index: usize) -> bool {
         let Some(v) = self.views.get(index) else { return false };
         let Some(doc) = self.session.get(v.id) else { return false };
+        // Evora (EVORA-COL-63, F4): Evora holds this very state, the typing included.
+        if self.typed_save_holds(index) {
+            return false;
+        }
         doc.dirty
             || v.pending_edit.is_some()
             || v.content.blocked().is_some()
@@ -649,6 +653,8 @@ impl PdfCraftApp {
     /// Save the active document. Returns `true` if it was written.
     pub fn save_active(&mut self, target: SaveTarget) -> bool {
         match self.active {
+            // Evora (EVORA-COL-63, F4): the member's own Save keeps the typing open, as Evora's do.
+            Some(i) if target == SaveTarget::InPlace && self.host_save_ack.is_some() => self.save_for_host(i).unwrap_or(false),
             Some(i) => self.save_view(i, target),
             None => false,
         }
@@ -717,7 +723,7 @@ impl PdfCraftApp {
                 (Some(save), _) => match save(id.0, &name, &bytes, save_as) {
                     Ok(Some(ticket)) => {
                         let generation = self.session.get(id).map_or(0, |d| d.edit_generation());
-                        self.pending_host_saves.push(crate::PendingHostSave { ticket, id, bytes, generation, after: Box::new(after) });
+                        self.pending_host_saves.push(crate::PendingHostSave { ticket, id, bytes, generation, typing: None, after: Box::new(after) });
                         return false;
                     }
                     Ok(None) => Ok(()),
@@ -802,6 +808,15 @@ impl PdfCraftApp {
             let Some(at) = self.pending_host_saves.iter().position(|p| p.ticket == ticket) else { continue };
             let pending = self.pending_host_saves.remove(at);
             let unchanged = self.session.get(pending.id).is_some_and(|d| d.edit_generation() == pending.generation);
+            // Evora (EVORA-COL-63, F4): bytes that carried the member's typing are not the document,
+            // which stays as it is, the typing open; while both are unchanged, nothing is left to save.
+            if let Some(edits) = pending.typing {
+                if ok && unchanged {
+                    self.host_typed_save = Some(crate::evora::HostTypedSave { id: pending.id, generation: pending.generation, edits });
+                    (pending.after)(self);
+                }
+                continue;
+            }
             if !ok || !unchanged || self.session.mark_saved(pending.id, pending.bytes, None).is_err() {
                 continue;
             }

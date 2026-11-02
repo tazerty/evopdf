@@ -927,7 +927,14 @@ mod ehp {
     /// `evora:request-save` reasons (§4.3).
     const SAVE_REASONS: [&str; 5] = ["autosave", "visibility", "close", "logout", "user"];
     /// CI only: what the smoke test may run in the engine (`window.__evoraRun`, [`install_probe`]).
-    const PROBE_COMMANDS: [&str; 2] = ["page.rotate", PROBE_PASSWORD];
+    const PROBE_COMMANDS: [&str; 4] = ["page.rotate", PROBE_PASSWORD, PROBE_TYPE, PROBE_TYPE_MORE];
+    /// CI only (EVORA-COL-63, F4, scenario « pont-saisie »): Add text typing without a keyboard
+    /// (`PdfCraftApp::evora_ci_type`): a new text box holding [`PROBE_TYPED`] on the keyboard, then
+    /// [`PROBE_TYPED_MORE`] typed at its end. Fixed texts: no free text crosses.
+    pub const PROBE_TYPE: &str = "evora-ci.type";
+    pub const PROBE_TYPE_MORE: &str = "evora-ci.type-more";
+    pub const PROBE_TYPED: &str = "Ligne ajoutée dans Col";
+    pub const PROBE_TYPED_MORE: &str = "ophon";
     /// CI only (COL-40, correction 1): answers the password prompt with [`PROBE_PASSWORD_VALUE`], as
     /// the prompt's Open button does. No free text crosses: the value is fixed.
     pub const PROBE_PASSWORD: &str = "evora-ci.password";
@@ -977,9 +984,9 @@ mod ehp {
         Init { settings: Option<String>, writable: bool, lang: Option<&'static str>, dark: bool, author: Option<String> },
         Lang(Option<&'static str>),
         Theme(bool),
-        /// COL-08: `evora:request-save` `re` for the session's document `doc` (`DocId.0`), and whether
-        /// its reason is `autosave` (EVORA-COL-58: an automatic save never interrupts typing).
-        RequestSave { re: String, doc: u64, autosave: bool },
+        /// COL-08: `evora:request-save` `re` for the session's document `doc` (`DocId.0`). Its reason
+        /// no longer matters to the engine (EVORA-COL-63: no save interrupts typing).
+        RequestSave { re: String, doc: u64 },
         /// `evora:open` `re` (COL-40): the app opens the bytes, then the bridge answers. S-ACK-6: the
         /// same `docRef` again ("reload the server's version") replaces the document it names.
         Open(OpenRequest),
@@ -1727,7 +1734,8 @@ mod ehp {
             ack(&st, id, false, Some("not_found"));
             return;
         };
-        st.events.borrow_mut().push(HostEvent::RequestSave { re: id.to_string(), doc, autosave: reason == "autosave" });
+        let _ = reason;
+        st.events.borrow_mut().push(HostEvent::RequestSave { re: id.to_string(), doc });
         st.ctx.request_repaint();
     }
 
@@ -2065,7 +2073,7 @@ impl EvoraApp {
                     self.catalog_due = true;
                 }
                 ehp::HostEvent::Theme(dark) => self.set_dark(dark),
-                ehp::HostEvent::RequestSave { re, doc, autosave } => self.request_save(&re, doc, autosave),
+                ehp::HostEvent::RequestSave { re, doc } => self.request_save(&re, doc),
                 ehp::HostEvent::Command { re, command, params_empty, confirmed } => {
                     self.run_command(&re, &command, params_empty, confirmed);
                 }
@@ -2190,25 +2198,25 @@ impl EvoraApp {
 
     /// COL-08: the host's `evora:request-save` `re`, for the session's document `doc`: `evora:save`
     /// with `re` when it has unsaved work, `evora:ack {ok: true, code: "clean"}` otherwise.
-    /// EVORA-COL-58 (F4): an `autosave` that comes while the member types is answered `busy` at once
-    /// (`PdfCraftApp::host_save_answer`): the typing stays open, on the keyboard, and Evora asks again
-    /// on its next cycle (HOST-PROTOCOL.md §4.5); the other reasons commit the typing and save.
-    fn request_save(&mut self, re: &str, doc: u64, autosave: bool) {
+    /// EVORA-COL-63 (F4): whatever the reason, what the member is typing goes with the bytes and stays
+    /// open (`PdfCraftApp::save_for_host`): no save interrupts typing, and none waits for it. When the
+    /// engine refuses the typing (added text it can't draw, a field that refuses its value), the
+    /// answer says so: `evora:ack {ok: false, code}` with that code, which Evora shows the member.
+    fn request_save(&mut self, re: &str, doc: u64) {
         use pdfcraft_ui_egui::HostSaveAnswer;
         let Some(link) = self.link.clone() else { return };
         let Some(index) = self.index_of(doc) else {
             link.answer(re, false, "not_found");
             return;
         };
-        match self.inner.host_save_answer(index, autosave) {
+        match self.inner.host_save_answer(index) {
             HostSaveAnswer::NotFound => link.answer(re, false, "not_found"),
             HostSaveAnswer::Clean => link.answer(re, true, "clean"),
-            HostSaveAnswer::Busy => link.answer(re, false, "busy"),
             HostSaveAnswer::Save => {
                 link.arm_request(re);
-                let _ = self.inner.save_view(index, pdfcraft_ui_egui::SaveTarget::InPlace);
+                let refused = self.inner.save_for_host(index).err();
                 if let Some(code) = link.disarm_request() {
-                    link.answer(re, false, code);
+                    link.answer(re, false, refused.unwrap_or(code));
                 }
             }
         }
@@ -2271,6 +2279,10 @@ impl eframe::App for EvoraApp {
             // CI only (COL-40, correction 1): the password of the smoke test's encrypted fixture.
             if command == ehp::PROBE_PASSWORD {
                 self.inner.submit_password(Some(ehp::PROBE_PASSWORD_VALUE.to_string()));
+            } else if command == ehp::PROBE_TYPE || command == ehp::PROBE_TYPE_MORE {
+                // CI only (EVORA-COL-63, F4): the smoke test's typing.
+                let start = command == ehp::PROBE_TYPE;
+                let _ = self.inner.evora_ci_type(if start { ehp::PROBE_TYPED } else { ehp::PROBE_TYPED_MORE }, start);
             } else {
                 let _ = self.inner.execute(&command);
             }

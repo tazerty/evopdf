@@ -40,6 +40,9 @@ pub mod text_fonts;
 mod text_preview;
 pub mod word_count;
 pub mod xfa;
+/// Evora (EVORA-COL-63, F4): the bytes of a document with what the member is typing, the document
+/// itself left as it is.
+mod evora;
 
 pub use signature_image::{ImageSignaturePreview, SignatureImage};
 pub use signature_scan::{PhotoRect, ScanError, SignaturePhoto, Turn};
@@ -4473,13 +4476,20 @@ impl Session {
         if !editor.cos.is_modified() && on_saved && (!editor.cos.reconstructed() || doc.is_signed()) {
             return Ok(editor.saved.clone());
         }
+        self.write_save(editor, &editor.cos)
+    }
+
+    /// [`Self::save_bytes`]'s writing of `cos`: the editor's graph, or (Evora, EVORA-COL-63) a copy
+    /// of it with the member's typing applied (`Session::save_bytes_with`).
+    fn write_save(&self, editor: &Editor, cos: &pdfcraft_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
+        let on_saved = Arc::ptr_eq(cos.bytes(), &editor.saved);
         // What the user removed again before saving (a cleared redaction mark) stays out of the file.
         let opts = SaveOptions { mod_date: self.now().map(pdfcraft_cos::pdf_date), drop_unlinked: true, ..SaveOptions::default() };
         // A restored snapshot can be based on an earlier revision. Append to the last saved
         // file so that revision stays in the chain. A full rewrite (redaction, new encryption,
         // a reconstructed file) still writes the current graph on its own.
-        let rewrite = editor.cos.full_save_required() || editor.cos.encryption_changed() || editor.cos.revisions().is_empty();
-        let cos = writable(&editor.cos)?;
+        let rewrite = cos.full_save_required() || cos.encryption_changed() || cos.revisions().is_empty();
+        let cos = writable(cos)?;
         guard(|| {
             if on_saved || rewrite {
                 write_incremental(&cos, &opts)

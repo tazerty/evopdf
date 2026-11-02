@@ -94,6 +94,10 @@ impl ContentView {
     pub(crate) fn finish_draft(&mut self, added: &[Added]) -> Option<Edit> {
         self.draft.take().and_then(|d| finish(self, d, added))
     }
+    /// Evora (EVORA-COL-63, F4): the edit [`Self::finish_draft`] would apply, the draft left open.
+    pub(crate) fn draft_edit(&self, added: &[Added]) -> Option<Edit> {
+        self.clone().finish_draft(added)
+    }
     /// The draft's first character the standard fonts can't draw. Such a draft is kept open, and
     /// counts as unsaved work, until it is corrected or discarded.
     pub(crate) fn blocked(&self) -> Option<char> {

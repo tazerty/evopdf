@@ -582,6 +582,9 @@ struct PendingHostSave {
     id: DocId,
     bytes: std::sync::Arc<Vec<u8>>,
     generation: u64,
+    /// Evora (EVORA-COL-63, F4): the typing these bytes carry beyond the document
+    /// ([`PdfCraftApp::save_for_host`]); `None` for the document's own bytes.
+    typing: Option<Vec<pdfcraft_engine::Edit>>,
     after: Box<dyn FnOnce(&mut PdfCraftApp) + Send>,
 }
 
@@ -822,6 +825,8 @@ pub struct PdfCraftApp {
     pub host_save_outcomes: HostSaveOutcomes,
     /// Evora (COL-09): acknowledged saves still waiting for their outcome.
     pending_host_saves: Vec<PendingHostSave>,
+    /// Evora (EVORA-COL-63, F4): the last save Evora acknowledged with the member's typing in it.
+    host_typed_save: Option<evora::HostTypedSave>,
     /// A pending "save changes?" question (closing a dirty tab or quitting).
     pub close_request: Option<CloseRequest>,
     /// The button of the "save changes?" question the keyboard has chosen; Save when it opens.
@@ -1223,6 +1228,7 @@ impl PdfCraftApp {
             host_save_ack: None,
             host_save_outcomes: Default::default(),
             pending_host_saves: Vec::new(),
+            host_typed_save: None,
             close_request: None,
             save_prompt_button: Default::default(),
             save_prompt_seen: false,

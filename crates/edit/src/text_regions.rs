@@ -514,12 +514,9 @@ pub(super) fn rewrite_styled_block(
     let mut res = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
     let mut fonts = res.get(b"Font").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
     for line in lines.iter().filter(|line| line.font.starts_with("PCRange")) {
-        let mut f = Dict::new();
-        f.set(b"Type".to_vec(), Object::name("Font"));
-        f.set(b"Subtype".to_vec(), Object::name("Type1"));
-        f.set(b"BaseFont".to_vec(), Object::name(&line.base_font));
-        f.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
-        fonts.set(line.font.as_bytes().to_vec(), Object::Dict(f));
+        // Evora (EVORA-COL-63): an indirect font, see `crate::standard_font`.
+        let f = crate::standard_font(doc, fonts.get(line.font.as_bytes()), &line.base_font, true);
+        fonts.set(line.font.as_bytes().to_vec(), f);
     }
     let mut metrics = std::collections::BTreeMap::new();
     for (name, object) in fonts.iter().take(256) {

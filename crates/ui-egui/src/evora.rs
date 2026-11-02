@@ -23,12 +23,16 @@
 //! - EVORA-COL-58 (F6): the AI assistant tool (a model the member would bring himself: Evora's AI
 //!   goes through Evora's own service, repository rule 6) and the rest of the « Use JavaScript » tool
 //!   (document scripts and actions, whose added scripts Colophon refuses on save) are hidden; both
-//!   tool groups disappear. Tools ▸ Document JavaScripts… and Add a digital signature field (an
-//!   empty field, no signature) stay, as decided before; they are left to Evora's arbitration.
+//!   tool groups disappear. Add a digital signature field (an empty field, no signature) stays.
+//! - EVORA-COL-63 (Evora's D3-a): Tools ▸ Document JavaScripts… is hidden too: a script added there
+//!   is refused when the document is saved (Colophon's `active_content_added`), as for F6. (D3-b) The
+//!   « Use a certificate » tile no longer promises a certification: the catalogue names it after what
+//!   it still offers, « Validate all signatures » (read only, D-9).
 //!
-//! Two fixes of the bridge's daily use live here too (EVORA-COL-58): an automatic save asked by
-//! Evora never interrupts typing ([`PdfCraftApp::host_save_answer`], F4), and a submenu's arrow is
-//! drawn in a glyph the interface's fonts have ([`menu_button`], F5).
+//! Fixes of the bridge's daily use live here too: no save asked by Evora, whatever its reason, nor
+//! the member's own, interrupts typing: the bytes carry the typing and the text box stays open
+//! ([`PdfCraftApp::save_for_host`], EVORA-COL-63, F4); a submenu's arrow is drawn in a glyph the
+//! interface's fonts have ([`menu_button`], EVORA-COL-58, F5).
 //!
 //! Hidden commands and catalogue items stay out of the menus, the command palette, the keyboard
 //! shortcuts list, the tool panels and Home, and do nothing if run another way; a tool group whose
@@ -38,8 +42,9 @@
 //! they keep their confirmation dialog.
 
 use pdfcraft_engine::catalog::{self, ToolGroup};
+use pdfcraft_engine::{DocId, Edit};
 
-use crate::{Dialog, LeftPanel, PdfCraftApp, QuickTool};
+use crate::{Dialog, LeftPanel, PdfCraftApp, QuickTool, SaveTarget};
 
 /// Registry commands and catalogue items hidden from every list and ignored when run.
 pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
@@ -92,6 +97,8 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     // EVORA-COL-58 (F6): the rest of the « Use JavaScript » tool (its console is hidden above).
     "js.document",
     "js.actions",
+    // EVORA-COL-63 (D3-a): Tools ▸ Document JavaScripts…, whose added scripts Colophon refuses on save.
+    "tools.document_js",
     // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
     // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
 ];
@@ -135,6 +142,7 @@ fn dialog_command(dialog: &Dialog) -> Option<&'static str> {
         // The Action Wizard runs and edits actions whose steps recognize text.
         Dialog::ActionWizard => "actions.wizard",
         Dialog::JsConsole => "tools.js_console",
+        Dialog::DocumentJs => "tools.document_js",
         Dialog::Sanitize => "redact.sanitize",
         Dialog::RemoveHidden => "protect.remove_hidden",
         _ => return None,
@@ -197,27 +205,38 @@ impl PdfCraftApp {
     }
 }
 
-/// Evora (EVORA-COL-58, F4): the host bridge's answer to Evora's `evora:request-save` for one tab
-/// (HOST-PROTOCOL.md §4.3 and §4.5).
+/// Evora (EVORA-COL-58, F4; EVORA-COL-63): the host bridge's answer to Evora's
+/// `evora:request-save` for one tab (HOST-PROTOCOL.md §4.3 and §4.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostSaveAnswer {
     /// No such tab: `evora:ack {ok: false, code: "not_found"}`.
     NotFound,
     /// Nothing to save: `evora:ack {ok: true, code: "clean"}`.
     Clean,
-    /// An automatic save while the member types: `evora:ack {ok: false, code: "busy"}`. Nothing is
-    /// committed, closed or moved off the keyboard; Evora keeps its state and asks again on its next
-    /// cycle (§4.5), and the typing goes with that save or the member's own.
-    Busy,
-    /// Save now, typing committed first (#166), as before: `evora:save`.
+    /// Save now ([`PdfCraftApp::save_for_host`]): `evora:save`, or `evora:ack {ok: false, code}` with
+    /// the code it returns when the engine refuses what the member typed.
     Save,
+}
+
+/// `evora:ack` code of a save the engine refuses because the added text being typed has a
+/// character no PDF font of this build can draw (it stays open, with its warning).
+pub const REFUSED_TEXT: &str = "unsupported";
+/// `evora:ack` code of a save the engine refuses because a form field refuses what was typed in
+/// it (its format or validation script; the field tells why and stays open with the text).
+pub const REFUSED_FIELD: &str = "invalid_content";
+
+/// Evora (EVORA-COL-63, F4): a save Evora acknowledged whose bytes carried the member's typing
+/// ([`PdfCraftApp::save_for_host`]): the document's edit generation then, and that typing.
+pub(crate) struct HostTypedSave {
+    pub(crate) id: DocId,
+    pub(crate) generation: u64,
+    pub(crate) edits: Vec<Edit>,
 }
 
 impl PdfCraftApp {
     /// Evora (EVORA-COL-58, F4): whether the member is typing in tab `index`: new text being added, a
     /// paragraph open for editing, a form field or the Fill & Sign type box open, or a text field of
-    /// the interface holding the keyboard. A save commits each of them, which closes the box: the
-    /// letters typed next would go to the tools' keys (H picks the Hand).
+    /// the interface holding the keyboard.
     pub fn typing_session(&self, index: usize) -> bool {
         let Some(v) = self.views.get(index) else { return false };
         v.content.draft.is_some()
@@ -227,22 +246,132 @@ impl PdfCraftApp {
             || self.ctx.as_ref().is_some_and(|ctx| ctx.text_edit_focused())
     }
 
-    /// Evora (EVORA-COL-58, F4): how the bridge answers Evora's `evora:request-save` for tab `index`.
-    /// An automatic save (`autosave`, Evora's timer) waits while the member types: answering at once
-    /// with `busy` keeps Evora's single save request free for a save the member asks for, and no
-    /// unchanged version reaches Evora Drive. Every other reason (`user`, `close`, `logout`,
-    /// `visibility`) saves as before, typing committed first.
-    pub fn host_save_answer(&self, index: usize, autosave: bool) -> HostSaveAnswer {
+    /// Evora (EVORA-COL-63, F4): how the bridge answers Evora's `evora:request-save` for tab `index`,
+    /// whatever its reason (`autosave`, `visibility`, `user`, `close`, `logout`): nothing to save
+    /// (the typing included) is `Clean`, anything else saves. No save waits for the typing any more
+    /// (EVORA-COL-58's `busy`, which held every automatic save while a text field kept the keyboard).
+    pub fn host_save_answer(&self, index: usize) -> HostSaveAnswer {
         if index >= self.views.len() {
             return HostSaveAnswer::NotFound;
         }
         if !self.has_unsaved_work(index) {
             return HostSaveAnswer::Clean;
         }
-        if autosave && self.typing_session(index) {
-            return HostSaveAnswer::Busy;
-        }
         HostSaveAnswer::Save
+    }
+
+    /// Evora (EVORA-COL-63, F4): the edits committing the typing in tab `index` would apply
+    /// (`commit_typing_in`), in its order, nothing committed: a queued edit, a form field's text, the
+    /// Fill & Sign type box, new or retyped added text, an open paragraph. `Err` with the first
+    /// character of added text that no PDF font of this build can draw: such text can't be saved.
+    pub(crate) fn typing_edits(&self, index: usize) -> Result<Vec<Edit>, char> {
+        let Some(v) = self.views.get(index) else { return Ok(Vec::new()) };
+        let Some(doc) = self.session.get(v.id) else { return Ok(Vec::new()) };
+        if let Some(c) = v.content.blocked() {
+            return Err(c);
+        }
+        let mut edits: Vec<Edit> = v.pending_edit.iter().cloned().collect();
+        edits.extend(v.forms.focus.as_ref().and_then(|f| crate::forms_ui::draft_edit(f, &doc.form)));
+        if let Some(tb) = v.fill_text.as_ref().filter(|t| !t.text.trim().is_empty()) {
+            let rotation = crate::comments::page_rotation(&doc.info, tb.page);
+            edits.push(crate::fill_sign::typed(tb.page, tb.at, tb.text.trim(), tb.size, rotation, &self.comment_prefs.author));
+        }
+        edits.extend(v.content.draft_edit(doc.added()));
+        edits.extend(v.line_editor.clone().filter(|ed| ed.has_changes()).and_then(crate::edit_text_ui::finished_edit));
+        Ok(edits)
+    }
+
+    /// Evora (EVORA-COL-63, F4): Evora acknowledged a save of tab `index` as it is now: the document
+    /// unchanged since, and the same typing.
+    pub(crate) fn typed_save_holds(&self, index: usize) -> bool {
+        let Some(saved) = self.host_typed_save.as_ref() else { return false };
+        let Some(v) = self.views.get(index).filter(|v| v.id == saved.id) else { return false };
+        self.session.get(v.id).is_some_and(|d| d.edit_generation() == saved.generation)
+            && self.typing_edits(index).is_ok_and(|edits| edits == saved.edits)
+    }
+
+    /// Evora (EVORA-COL-63, F4): save tab `index` for Evora (`evora:request-save`, whatever its
+    /// reason, and the member's own Save in the Atelier). What is being typed goes with the bytes
+    /// ([`pdfcraft_engine::Session::save_bytes_with`]) and stays open: cursor, keyboard and tool
+    /// unchanged, the next letters go on into the text. The document itself is left as it is until
+    /// the member commits the typing; Evora's acknowledgement then holds while neither changes.
+    /// Without typing, or without Evora, Save as before. `Ok` as [`Self::save_view`]; `Err` with the
+    /// `evora:ack` code when the engine refuses the typing ([`REFUSED_TEXT`], [`REFUSED_FIELD`]).
+    pub fn save_for_host(&mut self, index: usize) -> Result<bool, &'static str> {
+        let Some(id) = self.views.get(index).map(|v| v.id) else { return Err("not_found") };
+        let edits = match self.typing_edits(index) {
+            Ok(edits) => edits,
+            Err(_) => {
+                // As before: the text, its warning and Discard are brought on screen (`commit_typing_in`).
+                let _ = self.commit_typing_in(id);
+                return Err(REFUSED_TEXT);
+            }
+        };
+        if edits.is_empty() || self.host_save_ack.is_none() {
+            return self.commit_then_save(index, id);
+        }
+        let mut all = edits.clone();
+        if self.flatten_fill_sign_on_save {
+            all.push(Edit::FlattenFillSign);
+        }
+        match self.session.save_bytes_with(id, &all) {
+            Ok(bytes) => Ok(self.send_typed(id, bytes, edits)),
+            // What the document refuses (a field's format or script…) is committed as before, which
+            // tells the member why and keeps the text.
+            Err(_) => self.commit_then_save(index, id),
+        }
+    }
+
+    /// The typing committed, then Save as before (`save_view`).
+    fn commit_then_save(&mut self, index: usize, id: DocId) -> Result<bool, &'static str> {
+        if !self.commit_typing_in(id) {
+            return Err(REFUSED_FIELD);
+        }
+        Ok(self.save_view(index, SaveTarget::InPlace))
+    }
+
+    /// The bytes of a save with typing handed to Evora (`host_save_ack`): its outcome is applied by
+    /// `apply_host_save_outcomes`; a host that doesn't acknowledge saves holds them at once.
+    fn send_typed(&mut self, id: DocId, bytes: std::sync::Arc<Vec<u8>>, edits: Vec<Edit>) -> bool {
+        let Some((name, generation)) = self.session.get(id).map(|d| (d.name.clone(), d.edit_generation())) else { return false };
+        let Some(save) = self.host_save_ack.as_ref() else { return false };
+        match save(id.0, &name, &bytes, false) {
+            Ok(Some(ticket)) => {
+                self.pending_host_saves.push(crate::PendingHostSave { ticket, id, bytes, generation, typing: Some(edits), after: Box::new(|_: &mut PdfCraftApp| {}) });
+                false
+            }
+            Ok(None) => {
+                self.host_typed_save = Some(HostTypedSave { id, generation, edits });
+                true
+            }
+            Err(e) => {
+                self.notify_fmt("Couldn't save {name}: {e}", &[("name", &name), ("e", &e)]);
+                false
+            }
+        }
+    }
+
+    /// CI only (the web bridge's `window.__evoraRun`, `?evora-audit=1`): Add text typing without a
+    /// keyboard, in the active tab: with `start`, a new text box on page 1 holding `text`, on the
+    /// keyboard, the Add text tool picked; otherwise `text` typed at the end of the open box.
+    /// Returns whether it did.
+    pub fn evora_ci_type(&mut self, text: &str, start: bool) -> bool {
+        let Some(i) = self.active else { return false };
+        let Some(view) = self.views.get_mut(i) else { return false };
+        if start {
+            let style = pdfcraft_engine::AddedText { size: 14.0, ..Default::default() };
+            let draft = crate::content_ui::TextDraft { page: 0, index: None, rect: [24.0, 60.0, 280.0, 80.0], text: text.to_string(), style, focus: true };
+            view.content.draft = Some(draft);
+            self.quick_tool = QuickTool::AddText;
+            return true;
+        }
+        match view.content.draft.as_mut() {
+            Some(d) => {
+                d.text.push_str(text);
+                true
+            }
+            None => false,
+        }
     }
 }
 

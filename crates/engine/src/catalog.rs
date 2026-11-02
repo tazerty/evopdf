@@ -381,13 +381,16 @@ pub static TOOL_GROUPS: &[ToolGroup] = &[
     },
     ToolGroup {
         id: "certificate",
-        label: "Use a certificate",
+        // Evora (EVORA-COL-63, D3-b): named after what the Colophon Atelier still offers here, read
+        // only (signing and certifying are Evora Sign's, D-9); upstream: « Use a certificate »,
+        // section « Certificates ». Both names are translated catalogue entries already.
+        label: "Validate all signatures",
         icon: "badge-check",
         hue: TEAL,
         badge: None,
         availability: Ready,
         sections: &[ToolSection {
-            title: "Certificates",
+            title: "Signatures",
             items: &[
                 item("Digitally sign", "signature", "sign.digital", Ready),
                 item("Timestamp", "clock-3", "sign.timestamp", Planned("M9")),

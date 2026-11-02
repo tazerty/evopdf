@@ -255,6 +255,27 @@ fn matrix_number(value: f64) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// Evora (EVORA-COL-63): a standard Type 1 font (`base`, in WinAnsiEncoding when `encoded`) as an
+/// indirect object, the one `current` already refers to when it is that very font. Poppler gives a
+/// font written straight into a resource dictionary an object number of its own making and then
+/// looks that number up: `pdffonts` printed « Internal Error: xref num … not found but needed, try to
+/// reconstruct » for every save of the Colophon Atelier that added text.
+pub(crate) fn standard_font(doc: &mut Document, current: Option<&Object>, base: &str, encoded: bool) -> Object {
+    let mut font = Dict::new();
+    font.set(b"Type".to_vec(), Object::name("Font"));
+    font.set(b"Subtype".to_vec(), Object::name("Type1"));
+    font.set(b"BaseFont".to_vec(), Object::name(base));
+    if encoded {
+        font.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
+    }
+    if let Some(r) = current.and_then(Object::as_ref)
+        && doc.dict(&Object::Ref(r)).is_some_and(|d| d == font)
+    {
+        return Object::Ref(r);
+    }
+    Object::Ref(doc.add(Object::Dict(font)))
+}
+
 fn n(v: f64) -> String {
     let s = format!("{:.3}", if v.abs() < 5e-4 { 0.0 } else { v });
     let s = s.trim_end_matches('0').trim_end_matches('.');
@@ -397,12 +418,9 @@ fn add_page_resources(doc: &mut Document, page: &pdfcraft_model::Page, opacity: 
     let mut res = page.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
     let mut fonts = res.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()).unwrap_or_default();
     for (name, base) in faces {
-        let mut font = Dict::new();
-        font.set(b"Type".to_vec(), Object::name("Font"));
-        font.set(b"Subtype".to_vec(), Object::name("Type1"));
-        font.set(b"BaseFont".to_vec(), Object::name(base));
-        font.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
-        fonts.set(name.clone(), Object::Dict(font));
+        // Evora (EVORA-COL-63): an indirect font, see `standard_font`.
+        let font = standard_font(doc, fonts.get(name), base, true);
+        fonts.set(name.clone(), font);
     }
     res.set(b"Font".to_vec(), Object::Dict(fonts));
     if let Some(o) = opacity {
