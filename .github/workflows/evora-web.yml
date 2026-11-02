@@ -476,7 +476,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev
+            libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev poppler-utils
 
       - name: Rust (rustup, version épinglée)
         run: |
@@ -555,7 +555,7 @@ jobs:
           fi
           python3 -I .github/evora/gates.py masks-witness "$RUNNER_TEMP/masques.log" "$RUNNER_TEMP/temoin-palette.log" palette-groups
 
-      - name: Reprise automatique pendant la saisie, glyphes du menu principal (bloquante)
+      - name: Glyphes du menu principal, garde des sous-menus (bloquante)
         if: ${{ !cancelled() }}
         env:
           RUST_BACKTRACE: "0"
@@ -563,12 +563,67 @@ jobs:
           # Les polices de l'interface seules, comme dans le build web : aucune police du système en repli.
           PDFCRAFT_SYSTEM_FONTS: "0"
         run: |
-          # EVORA-COL-58 : F4, une reprise automatique d'Evora (evora:request-save, raison autosave) arrivée
-          # pendant une saisie répond « busy » sans rien valider, et la frappe qui suit va au texte, l'outil
-          # inchangé (témoins : l'enregistrement demandé valide et enregistre, rien à enregistrer répond
-          # « clean », hors saisie la reprise enregistre) ; F5, le menu principal ouvert ne dessine aucun
-          # caractère absent des polices de l'interface (témoin : ses sous-menus dessinés). Lancée même
-          # après une recette des masquages rouge, pour que chaque témoin sabordé se lise en entier.
+          # EVORA-COL-58 : F5, le menu principal ouvert ne dessine aucun caractère absent des polices de
+          # l'interface (témoin : ses sous-menus dessinés). EVORA-COL-63 (RC2-11 d'Evora) : aucune source du
+          # shell n'appelle elle-même menu_button ni SubMenuButton::new d'egui (garde statique). F4 est jugée
+          # par l'étape suivante depuis EVORA-COL-63. Lancée même après une recette des masquages rouge, pour
+          # que chaque témoin sabordé se lise en entier.
           set -euo pipefail
           cargo test --locked --offline -p pdfcraft-ui-egui --test evora_finitions -- --test-threads=1 --nocapture 2>&1 \
             | tee "$RUNNER_TEMP/finitions.log"
+
+      - name: Saisie jamais coupée par un enregistrement, texte Unicode, polices indirectes (bloquante)
+        if: ${{ !cancelled() }}
+        env:
+          RUST_BACKTRACE: "0"
+          CARGO_PROFILE_DEV_DEBUG: "0"
+          EVORA_SAISIE_PDF_DIR: ${{ runner.temp }}/evora-saisie-pdf
+        run: |
+          # EVORA-COL-63 : F4 (D3-e d'Evora), quel que soit l'enregistrement demandé par Evora pendant une saisie
+          # (texte ajouté, paragraphe existant ouvert, champ de formulaire), les octets portent tout le texte tapé,
+          # la zone reste ouverte avec le même outil et la frappe continue ; D3-d, un texte ajouté hors Europe
+          # occidentale est du vrai texte en Inter incorporée (le chinois reste refusé, témoin) ; les polices du
+          # texte ajouté sont des objets indirects (Poppler : « xref num … not found but needed »).
+          set -euo pipefail
+          cargo test --locked --offline -p pdfcraft-ui-egui --test evora_saisie -- --test-threads=1 --nocapture 2>&1 \
+            | tee "$RUNNER_TEMP/saisie.log"
+
+      - name: Enregistrements relus par Poppler (pdffonts, pdfinfo, pdftotext ; bloquante)
+        if: ${{ !cancelled() }}
+        run: |
+          # EVORA-COL-63 : chaque PDF écrit par l'étape précédente se lit sans un mot sur la sortie d'erreur de
+          # pdffonts ni de pdfinfo (l'Atelier faisait dire à Poppler « Internal Error: xref num … not found but
+          # needed, try to reconstruct ») ; pdftotext y retrouve le texte Unicode ajouté.
+          # Le shell des étapes s'arrête au premier échec (-e) : ici chaque outil doit pouvoir échouer sans
+          # interrompre la relecture, le verdict tombe à la fin.
+          set +e
+          set -uo pipefail
+          dir="$RUNNER_TEMP/evora-saisie-pdf"
+          pdffonts -v 2>&1 | head -n 1 || true
+          n=0; bad=0
+          for f in "$dir"/*.pdf; do
+            [ -e "$f" ] || continue
+            n=$((n + 1))
+            for tool in pdffonts pdfinfo; do
+              err=$("$tool" "$f" 2>&1 >/dev/null)
+              if [ -n "$err" ]; then
+                echo "::error::$tool $(basename "$f") : $err"
+                bad=$((bad + 1))
+              fi
+            done
+          done
+          for want in "$dir"/unicode-*.txt; do
+            [ -e "$want" ] || continue
+            f="${want%.txt}.pdf"
+            got=$(pdftotext -enc UTF-8 "$f" - 2>/dev/null | tr -s ' \n' '  ')
+            if ! printf '%s' "$got" | grep -qF -- "$(cat "$want")"; then
+              echo "::error::pdftotext $(basename "$f") : « $(cat "$want") » introuvable dans « $got »"
+              bad=$((bad + 1))
+            fi
+          done
+          echo "::notice::Poppler : $n enregistrement(s) relu(s), $bad faute(s)"
+          if [ "$n" -lt 5 ]; then
+            echo "::error::Poppler : $n enregistrement(s) seulement (au moins 5 attendus) : rien à juger"
+            exit 1
+          fi
+          [ "$bad" -eq 0 ]

@@ -37,7 +37,13 @@
 //! Evora's AI service, repository rule 6) and the rest of the « Use JavaScript » tool (document
 //! scripts and actions, whose added scripts Colophon refuses on save) are hidden: both groups join the
 //! hidden ones (no tile, no palette group, no panel, no item found), beside the kept group of their
-//! category, « Add search index » (twin). Tools ▸ Document JavaScripts… stays (witness of « temoins »).
+//! category, « Add search index » (twin).
+//!
+//! EVORA-COL-63 (Evora's D3-a): Tools ▸ Document JavaScripts… is hidden too (its added scripts are
+//! refused on save): it joins SCOPE (palette, menus, running, its dialog closed whatever opens it,
+//! automation's `--dialog document-js` included). (D3-b) The « Use a certificate » tile no longer
+//! promises a certification: it is named after what it offers, « Validate all signatures »; neither
+//! its old name nor « Certificates » is shown, in its panel or the expanded All tools view.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -75,6 +81,8 @@ const SCOPE: &[&str] = &[
     "ai.translate",
     "js.document",
     "js.actions",
+    // EVORA-COL-63 (D3-a).
+    "tools.document_js",
 ];
 /// Tool groups whose items are all hidden: they must disappear.
 const HIDDEN_GROUPS: &[&str] = &["scan", "redact", "actions", "javascript", "ai"];
@@ -451,6 +459,9 @@ fn digital_signatures_certification_and_identities_are_out_of_reach() {
         }
     }
     v.present(&h, "panneau « Use a certificate »", "Validate all signatures");
+    // EVORA-COL-63 (D3-b): the tile promises no certification any more.
+    v.absent(&h, "panneau « Validate all signatures »", "Use a certificate");
+    v.absent(&h, "panneau « Validate all signatures »", "Certificates");
     // The Signatures panel shows the unsigned field, without a way to sign it.
     calm(&mut h);
     {
@@ -624,10 +635,10 @@ fn the_atelier_scope_q47_a_is_respected() {
     h.run_steps(3);
     v.present(&h, "panneau Commentaires, menu", "Export all to data file…");
     v.absent(&h, "panneau Commentaires, menu", "Import comments…");
-    let dialogs = [Dialog::JsConsole, Dialog::Sanitize, Dialog::RemoveHidden, Dialog::ActionWizard];
+    let dialogs = [Dialog::JsConsole, Dialog::Sanitize, Dialog::RemoveHidden, Dialog::ActionWizard, Dialog::DocumentJs];
     let tools = [QuickTool::EnhanceCamera];
     running_leaves_nothing(&mut v, &mut h, SCOPE, &dialogs, &tools);
-    for (key, value) in [("quick", "enhance-camera"), ("dialog", "js-console"), ("dialog", "action-wizard")] {
+    for (key, value) in [("quick", "enhance-camera"), ("dialog", "js-console"), ("dialog", "action-wizard"), ("dialog", "document-js")] {
         calm(&mut h);
         let _ = h.state_mut().set_option(key, value);
         h.run_steps(3);
@@ -676,6 +687,8 @@ fn the_expanded_all_tools_view_offers_nothing_hidden() {
     for g in ["certificate", "fill_sign", "protect", "edit", "form", "search_index", "compress"] {
         v.present(&h, "vue « All tools »", group_label(g));
     }
+    // EVORA-COL-63 (D3-b): the tile of signature validation is not « Use a certificate » any more.
+    v.absent(&h, "vue « All tools »", "Use a certificate");
     for id in SIGNATURE.iter().chain(REDACTION).chain(OCR).chain(SCOPE) {
         for label in labels(id) {
             view_search(&mut h, &label);
@@ -686,7 +699,9 @@ fn the_expanded_all_tools_view_offers_nothing_hidden() {
             }
         }
     }
-    for label in ["Validate all signatures", "Reduce file size", "Protect with password", "Export data", "Add text"] {
+    // « Validate all signatures » names its tile since EVORA-COL-63 (D3-b): a search for it finds the
+    // tile by its name, which lists no item; it is a twin of the palette instead (« temoins »).
+    for label in ["Reduce file size", "Protect with password", "Export data", "Add text"] {
         view_search(&mut h, label);
         let n = named_in_notes(&h, label);
         v.holds(n > 0, || format!("vue « All tools », recherche « {label} » : témoin non nommé"));
@@ -700,7 +715,7 @@ fn kept_neighbours_stay_reachable() {
     let mut v = Verdict::new("temoins");
     let mut h = harness(true, |_| {});
     for label in
-        ["Validate all signatures", "Signatures panel", "Fill & Sign: sign", "Document JavaScripts…", "Add text", "Edit text & images", "Reduce file size…"]
+        ["Validate all signatures", "Signatures panel", "Fill & Sign: sign", "Add text", "Edit text & images", "Reduce file size…"]
     {
         palette_for(&mut h, label);
         let n = nodes(&h, label);

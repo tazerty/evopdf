@@ -115,6 +115,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
+import zlib
 
 PORT_A = 8801
 PORT_B = 8802
@@ -658,7 +659,7 @@ def run_scenario(name, site, csp, out_dir, chrome_bin, query=ENGINE_QUERY, expec
     engine = start_server(PORT_A, "127.0.0.1", directory=site, csp=csp, served=served,
                           host_config={"parentOrigins": [PARENT_ORIGIN]} if host else None)
     body = parent_page_multi(query) if multi else parent_page_rob(query) if robust else parent_page_fin(query) if fin \
-        else parent_page(query, host, ACK_HARNESS if expect.get("accuse") else None)
+        else parent_page(query, host, ACK_HARNESS if expect.get("accuse") or expect.get("saisie") else None)
     parent = start_server(PORT_B, "127.0.0.1", page=body, served=served)
     # « localhost » peut se résoudre en ::1 : la page parente écoute aussi en IPv6 quand c'est possible.
     try:
@@ -811,6 +812,8 @@ def run_scenario(name, site, csp, out_dir, chrome_bin, query=ENGINE_QUERY, expec
                 run_accuse(chrome, page, (sess, ctx), contexts, result, errors, expect.get("sabotage", ""))
             elif expect.get("menus"):
                 run_menus(chrome, (sess, ctx), result, errors)
+            elif expect.get("saisie"):
+                run_saisie(chrome, page, (sess, ctx), contexts, result, errors)
             elif host:
                 run_ehp(chrome, page, (sess, ctx), contexts, result, errors, expect.get("sabotage", ""))
             gl = chrome.call("Runtime.evaluate", {"expression": GL_PROBE, "contextId": ctx, "returnByValue": True}, sess)
@@ -1276,6 +1279,13 @@ addEventListener("message", (e) => {
   if (fromEngine && plain && d.v === 1 && d.type === "evora:ready" && !st.ids.ready) {
     st.ids.ready = d.id;
     st.caps = Array.isArray(d.payload && d.payload.capabilities) ? d.payload.capabilities : [];
+  }
+  // EVORA-COL-63 (scénario « pont-saisie ») : les octets de chaque evora:save, en base64, pour y lire le texte écrit.
+  if (fromEngine && plain && d.type === "evora:save" && d.payload && d.payload.bytes instanceof ArrayBuffer) {
+    const u = new Uint8Array(d.payload.bytes);
+    let s = "";
+    for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768));
+    (st.saves = st.saves || []).push({id: d.id, re: d.re || null, b64: btoa(s)});
   }
 });
 const post = (type, payload, re, transfer) => {
@@ -2339,7 +2349,12 @@ FIN_SHELL = ("file", "create", "app", "help", "prefs")
 FIN_MASKED = ("help.github", "help.check_updates", "sign.digital", "sign.certify", "sign.certify_invisible",
               "sign.timestamp", "redact.mark", "redact.apply", "redact.sanitize", "ocr.recognize", "ocr.recognize_batch",
               "actions.wizard", "file.open_recent", "comment.import", "form.import_data", "tools.js_console",
-              "protect.remove_hidden")
+              "protect.remove_hidden",
+              # EVORA-COL-63 (D3-a) : Outils › Scripts du document…, dont un script ajouté est refusé à l'enregistrement.
+              "tools.document_js")
+# EVORA-COL-63 : identité du catalogue livré, PRÉDITE avant le run (catalogue provisionné de EVORA-COL-62, 155 commandes,
+# d0534f9d7bee4721, moins tools.document_js ; même calcul que fin_hash) : nombre de commandes et empreinte.
+FIN_CATALOG_EXPECTED = (154, "bfc0a2d67ad1856b")
 # Hors catalogue : un document neuf fait des fichiers de l'ordinateur ; le thème est celui de la coquille.
 FIN_OFF = ("page.combine", "view.theme", "view.theme.system", "view.theme.light", "view.theme.dark")
 # Témoins du catalogue : présents, avec ce drapeau destructif. EVORA-COL-53 : « edit.edit_text » (modifier le texte
@@ -2733,6 +2748,8 @@ def run_finitions(chrome, page, contexts, result, errors):
     first = received(st, m0, "evora:commands")
     cat_fr = (first[0].get("payload") or {}) if first else None
     problems = judge_catalog(cat_fr, "fr")
+    if cat_fr and (cat_fr.get("count"), cat_fr.get("hash")) != FIN_CATALOG_EXPECTED:
+        problems.append(f"identité {cat_fr.get('count')} commandes, {cat_fr.get('hash')} (prédite : {FIN_CATALOG_EXPECTED})")
     fin["catalogue_fr"] = {"recus": len(first), "compte": (cat_fr or {}).get("count"), "empreinte": (cat_fr or {}).get("hash"),
                            "ecarts": problems}
     if cat_fr and os.environ.get("EVORA_COMMANDS_OUT"):
@@ -2905,6 +2922,152 @@ def run_finitions(chrome, page, contexts, result, errors):
     fin["messages"] = [{k: x.get(k) for k in ("sent", "type", "re", "payload")} for x in st.get("log", [])
                        if x.get("type") != "evora:commands"][-40:]
 
+# Scénario « pont-saisie » (EVORA-COL-63, F4, décision D3-e d'Evora) : aucun enregistrement demandé par Evora, quelle
+# qu'en soit la raison, ne coupe une saisie. Le moteur tape un texte ajouté sans clavier (sonde CI evora-ci.type, puis
+# evora-ci.type-more ; textes fixes du pont, PROBE_TYPED et PROBE_TYPED_MORE), Evora demande une reprise automatique
+# PUIS, au milieu, un enregistrement à la perte de visibilité de l'onglet. Détecteurs : [saisie-octets] chaque
+# enregistrement porte tout le texte tapé jusque-là (flux de contenu décompressés), [saisie-editeur] la zone de texte
+# reste ouverte, avec tout le texte, après les deux enregistrements (audit au rendu : texte dessiné à l'instant).
+SAISIE_DOC = "01JX" + "X" * 20 + "S1"
+SAISIE_NAME = "evora-saisie.pdf"
+SAISIE_TYPED = "Ligne ajoutée dans Col"
+SAISIE_MORE = "ophon"
+SAISIE_PROBES = (SAISIE_TYPED, SAISIE_TYPED + SAISIE_MORE)
+
+
+def saved_streams(b64):
+    """Les flux d'un enregistrement reçu, décompressés quand ils le sont (FlateDecode) : là où le texte est écrit."""
+    data = base64.b64decode(b64)
+    out = []
+    for m in re.finditer(rb"stream\r?\n", data):
+        end = data.find(b"endstream", m.end())
+        if end < 0:
+            continue
+        try:
+            out.append(zlib.decompressobj().decompress(data[m.end():end]))
+        except zlib.error:
+            out.append(data[m.end():end])
+    return b"\n".join(out)
+
+
+def saisie_selftest():
+    """Le lecteur des enregistrements trouve un texte dans un flux compressé, et pas un texte absent."""
+    stream = zlib.compress(b"BT (Ligne ajout\xe9e dans Colophon) Tj ET")
+    pdf = b"1 0 obj\n<< /Filter /FlateDecode >>\nstream\n" + stream + b"\nendstream\nendobj\n"
+    found = saved_streams(base64.b64encode(pdf).decode())
+    return b"(Ligne ajout\xe9e dans Colophon)" in found and b"(Ligne ajout\xe9e dans Col)" not in found
+
+
+class AckBench:
+    """La coquille minimale d'ACK_HARNESS vue du banc : évaluations, attente, envois, réponses du moteur."""
+
+    def __init__(self, chrome, page):
+        self.chrome, self.page = chrome, page
+
+    def evaluate(self, expr, session, context=None):
+        return cdp_evaluate(self.chrome, expr, session, context)
+
+    def state(self):
+        return json.loads(self.evaluate(ACK_EXPR, self.page) or "{}")
+
+    def settle(self, seconds):
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            self.chrome.pump(0.1)
+
+    def wait(self, cond, timeout=20.0):
+        end = time.monotonic() + timeout
+        st = self.state()
+        while not cond(st) and time.monotonic() < end:
+            self.chrome.pump(0.2)
+            st = self.state()
+        return st
+
+    def send(self, type_, payload, re_=None):
+        return self.evaluate(f"window.__ackSend({json.dumps(type_)}, {json.dumps(payload)}, {json.dumps(re_)})", self.page)
+
+    @staticmethod
+    def answer(st, rid):
+        return next((m for m in st.get("log", []) if m.get("fromEngine") and rid and m.get("re") == rid), None)
+
+    def request(self, rid_payload):
+        """evora:request-save ; la réponse du moteur (ou None) et l'état de la coquille."""
+        rid = self.send("evora:request-save", rid_payload)
+        st = self.wait(lambda s: self.answer(s, rid) is not None, 15)
+        return self.answer(st, rid), st
+
+
+def saisie_open(bench, sai, errors):
+    """evora:init puis evora:open du document de la saisie ; vrai quand le moteur a accusé les deux."""
+    st = bench.wait(lambda s: s.get("ids", {}).get("ready"))
+    if not st.get("ids", {}).get("ready"):
+        errors.append("[banc] evora:ready absent")
+        return False
+    for label, expr in (("evora:init", "window.__ackInit([])"),
+                        ("evora:open", f"window.__ackOpen({json.dumps(SAISIE_DOC)}, {json.dumps(SAISIE_NAME)})")):
+        rid = bench.evaluate(expr, bench.page)
+        got = bench.answer(bench.wait(lambda s: bench.answer(s, rid) is not None), rid)
+        sai.setdefault("accuses", []).append({label: (got or {}).get("payload")})
+        if not got or (got.get("payload") or {}).get("ok") is not True:
+            errors.append(f"[banc] accusé de {label} absent ou négatif : {got}")
+            return False
+    bench.settle(1.5)
+    return True
+
+
+def saisie_save(bench, engine, reason, version, expected, sai, errors):
+    """Une demande d'enregistrement de raison `reason` : evora:save attendu, portant `expected` (texte complet tapé
+    jusque-là), puis evora:saved {ok: true} ; une faute [saisie-octets] sinon."""
+    got, st = bench.request({"reason": reason, "docRef": SAISIE_DOC})
+    kind = (got or {}).get("type")
+    save = next((x for x in st.get("saves") or [] if got and x.get("re") == got.get("re") and x.get("id") == got.get("id")), None)
+    streams = saved_streams(save["b64"]) if save else b""
+    want = b"(" + expected.encode("cp1252") + b")"
+    sai.setdefault("enregistrements", []).append({"raison": reason, "reponse": kind, "code": ((got or {}).get("payload") or {}).get("code"),
+                                                 "octets": len(base64.b64decode(save["b64"])) if save else 0, "texte": want in streams})
+    if kind != "evora:save" or want not in streams:
+        errors.append(f"[saisie-octets] enregistrement « {reason} » : réponse {kind} {((got or {}).get('payload') or {}).get('code')}, "
+                      f"texte {expected!r} {'présent' if want in streams else 'ABSENT'} des octets reçus")
+    if kind == "evora:save":
+        bench.send("evora:saved", {"ok": True, "version": version}, got.get("id"))
+        bench.settle(1.5)
+
+
+def run_saisie(chrome, page, engine, contexts, result, errors):
+    """EVORA-COL-63 (F4) : le texte tapé part avec chaque enregistrement d'Evora et la saisie continue."""
+    sess, ctx = engine
+    sai = result.setdefault("saisie", {})
+    bench = AckBench(chrome, page)
+    if not saisie_selftest():
+        errors.append("[banc] lecteur des enregistrements muet (flux compressé non lu)")
+    if not saisie_open(bench, sai, errors):
+        return
+
+    def type_(command):
+        done = bench.evaluate(f"typeof window.__evoraRun === 'function' && window.__evoraRun({json.dumps(command)})", sess, ctx)
+        if done is not True:
+            errors.append(f"[banc] window.__evoraRun({command!r}) indisponible ou refusé ({done})")
+        bench.settle(1.5)
+        return done is True
+
+    def drawn(probe):
+        a = json.loads(bench.evaluate("JSON.stringify(window.__evoraAudit || null)", sess, ctx) or "null") or {}
+        return int((a.get("exact_now") or {}).get(probe) or 0)
+
+    if not type_("evora-ci.type"):
+        return
+    sai["zone_ouverte"] = drawn(SAISIE_TYPED)
+    if sai["zone_ouverte"] < 1:
+        errors.append(f"[banc] zone de texte « {SAISIE_TYPED} » non dessinée après la sonde (mesure impossible)")
+        return
+    saisie_save(bench, engine, "autosave", 2, SAISIE_TYPED, sai, errors)
+    type_("evora-ci.type-more")
+    saisie_save(bench, engine, "visibility", 3, SAISIE_TYPED + SAISIE_MORE, sai, errors)
+    sai["zone_apres"] = drawn(SAISIE_TYPED + SAISIE_MORE)
+    if sai["zone_apres"] < 1:
+        errors.append(f"[saisie-editeur] après les enregistrements, zone de texte « {SAISIE_TYPED + SAISIE_MORE} » "
+                      f"non dessinée ({sai['zone_apres']} fois) : la saisie a été coupée")
+
 
 def error_tags(errors):
     return {m.group(1) for m in (re.match(r"^\[([^\]]+)\]", e) for e in errors) if m}
@@ -2919,65 +3082,82 @@ MENU_POINTER = """((x, y, type, buttons) => { const c = document.getElementById(
   return true; })(%(x)s, %(y)s, "%(type)s", %(buttons)s)"""
 
 
-def run_menus(chrome, engine, result, errors):
-    """EVORA-COL-58 : F6 (outils masqués de la vue « All tools » étendue) et F5 (flèches des sous-menus du menu
-    principal) au rendu, par des clics aux positions que l'audit relève ; un détecteur et un témoin par finition."""
-    sess, ctx = engine
-    menus = result.setdefault("menus", {})
+class MenuBench:
+    """Le document moteur du scénario « sous-menus » : son audit au rendu, et des clics aux positions qu'il relève."""
 
-    def audit():
-        return json.loads(cdp_evaluate(chrome, "JSON.stringify(window.__evoraAudit || null)", sess, ctx) or "null") or {}
+    def __init__(self, chrome, engine, menus, errors):
+        self.chrome, (self.sess, self.ctx), self.menus, self.errors = chrome, engine, menus, errors
 
-    def pause(seconds):
+    def audit(self):
+        return json.loads(cdp_evaluate(self.chrome, "JSON.stringify(window.__evoraAudit || null)", self.sess, self.ctx) or "null") or {}
+
+    def pause(self, seconds):
         end = time.monotonic() + seconds
         while time.monotonic() < end:
-            chrome.pump(0.05)
+            self.chrome.pump(0.05)
 
+    @staticmethod
     def now(a, probe):
         return int((a.get("exact_now") or {}).get(probe) or 0)
 
-    def click(label):
-        at = (audit().get("positions") or {}).get(label)
+    def click(self, label):
+        at = (self.audit().get("positions") or {}).get(label)
         if not (isinstance(at, list) and len(at) == 2 and 0 <= at[0] <= IFRAME_W and 0 <= at[1] <= IFRAME_H):
-            errors.append(f"[banc] « {label} » non dessiné dans le cadre du moteur (position {at!r}) : clic impossible")
+            self.errors.append(f"[banc] « {label} » non dessiné dans le cadre du moteur (position {at!r}) : clic impossible")
             return False
         x, y = round(at[0], 1), round(at[1], 1)
-        menus.setdefault("clics", []).append({"cible": label, "x": x, "y": y})
+        self.menus.setdefault("clics", []).append({"cible": label, "x": x, "y": y})
         for kind, buttons, wait in (("mousemove", 0, 0.4), ("pointerdown", 1, 0.15), ("pointerup", 0, 1.5)):
-            cdp_evaluate(chrome, MENU_POINTER % {"x": x, "y": y, "type": kind, "buttons": buttons}, sess, ctx, gesture=True)
-            pause(wait)
+            cdp_evaluate(self.chrome, MENU_POINTER % {"x": x, "y": y, "type": kind, "buttons": buttons}, self.sess, self.ctx, gesture=True)
+            self.pause(wait)
         return True
 
-    a0 = audit()
+
+def menus_hidden_tools(bench, a0):
+    """F6 : la vue « All tools » étendue ; les outils masqués ne doivent jamais avoir été dessinés."""
+    if not bench.click("View more"):
+        return
+    a1 = bench.audit()
+    drawn = {p: int((a1.get("probes") or {}).get(p) or 0) for p in MENU_HIDDEN_TOOLS}
+    kept0, kept1 = bench.now(a0, MENU_KEPT_TOOL), bench.now(a1, MENU_KEPT_TOOL)
+    bench.menus["outils"] = {"masques_dessines": drawn, "temoin": [kept0, kept1]}
+    if kept1 <= kept0:
+        bench.errors.append(f"[outils-temoin] vue « All tools » non étendue : « {MENU_KEPT_TOOL} » {kept0} → {kept1} "
+                            "(mesure impossible)")
+    elif any(drawn.values()):
+        bench.errors.append(f"[outils-masques] outils masqués dessinés dans la vue « All tools » étendue (fois) : {drawn}")
+
+
+def menus_arrows(bench):
+    """F5 : le menu principal, ses sous-menus et leurs flèches."""
+    before = bench.audit()
+    if not bench.click("Menu"):
+        return
+    after = bench.audit()
+    new = sorted(set(after.get("missing_now") or []) - set(before.get("missing_now") or []))
+    help0, help1 = bench.now(before, "Help"), bench.now(after, "Help")
+    arrows, egui_arrows = bench.now(after, MENU_ARROW), bench.now(after, MENU_ARROW_EGUI)
+    bench.menus["sous_menus"] = {"Help": [help0, help1], "fleche": arrows, "fleche_egui": egui_arrows,
+                                 "glyphes_absents": after.get("missing_now"), "neufs": new}
+    if help1 <= help0:
+        bench.errors.append(f"[menu-temoin] menu principal non ouvert : « Help » {help0} → {help1} (mesure impossible)")
+    elif new or egui_arrows:
+        bench.errors.append(f"[menu-glyphe] menu principal ouvert : caractères sans glyphe dans les polices de l'interface "
+                            f"{new} (dessinés « ? »), flèche d'egui U+23F5 dessinée {egui_arrows} fois "
+                            f"(flèche du moteur U+203A : {arrows})")
+
+
+def run_menus(chrome, engine, result, errors):
+    """EVORA-COL-58 : F6 (outils masqués de la vue « All tools » étendue) et F5 (flèches des sous-menus du menu
+    principal) au rendu, par des clics aux positions que l'audit relève ; un détecteur et un témoin par finition.
+    EVORA-COL-63 (RC2-10 d'Evora) : découpée en MenuBench, menus_hidden_tools et menus_arrows."""
+    bench = MenuBench(chrome, engine, result.setdefault("menus", {}), errors)
+    a0 = bench.audit()
     if a0.get("glyph_selftest") is not True:
         errors.append(f"[banc] détecteur de glyphes muet (glyph_selftest {a0.get('glyph_selftest')!r})")
-    menus["glyphes_absents_au_demarrage"] = a0.get("missing_now")
-    # F6 : la vue « All tools » étendue ; les outils masqués ne doivent jamais avoir été dessinés.
-    if click("View more"):
-        a1 = audit()
-        drawn = {p: int((a1.get("probes") or {}).get(p) or 0) for p in MENU_HIDDEN_TOOLS}
-        kept0, kept1 = now(a0, MENU_KEPT_TOOL), now(a1, MENU_KEPT_TOOL)
-        menus["outils"] = {"masques_dessines": drawn, "temoin": [kept0, kept1]}
-        if kept1 <= kept0:
-            errors.append(f"[outils-temoin] vue « All tools » non étendue : « {MENU_KEPT_TOOL} » {kept0} → {kept1} "
-                          "(mesure impossible)")
-        elif any(drawn.values()):
-            errors.append(f"[outils-masques] outils masqués dessinés dans la vue « All tools » étendue (fois) : {drawn}")
-    # F5 : le menu principal, ses sous-menus et leurs flèches.
-    before = audit()
-    if click("Menu"):
-        after = audit()
-        new = sorted(set(after.get("missing_now") or []) - set(before.get("missing_now") or []))
-        help0, help1 = now(before, "Help"), now(after, "Help")
-        arrows, egui_arrows = now(after, MENU_ARROW), now(after, MENU_ARROW_EGUI)
-        menus["sous_menus"] = {"Help": [help0, help1], "fleche": arrows, "fleche_egui": egui_arrows,
-                               "glyphes_absents": after.get("missing_now"), "neufs": new}
-        if help1 <= help0:
-            errors.append(f"[menu-temoin] menu principal non ouvert : « Help » {help0} → {help1} (mesure impossible)")
-        elif new or egui_arrows:
-            errors.append(f"[menu-glyphe] menu principal ouvert : caractères sans glyphe dans les polices de l'interface "
-                          f"{new} (dessinés « ? »), flèche d'egui U+23F5 dessinée {egui_arrows} fois "
-                          f"(flèche du moteur U+203A : {arrows})")
+    bench.menus["glyphes_absents_au_demarrage"] = a0.get("missing_now")
+    menus_hidden_tools(bench, a0)
+    menus_arrows(bench)
 
 
 def mark_witness(witness, expected, description):
@@ -3070,6 +3250,10 @@ def main(argv):
                        + urllib.parse.quote("|".join(MENU_PROBES), safe=""))
         results.append(run_scenario("sous-menus", site, engine_csp(hashes), out_dir, chrome_bin, menus_query,
                                     {"menus": True, "dark": False}))
+        # EVORA-COL-63 (F4) : une reprise automatique puis, au milieu, un onglet masqué pendant la saisie d'un texte ajouté.
+        saisie_query = "?host=evora&evora-audit=1&evora-probe=" + urllib.parse.quote("|".join(SAISIE_PROBES), safe="")
+        results.append(run_scenario("pont-saisie", site, engine_csp(hashes), out_dir, chrome_bin, saisie_query,
+                                    {"ehp": True, "saisie": True}))
     with open(os.path.join(out_dir, "smoke.json"), "w", encoding="utf-8") as fh:
         json.dump(results, fh, indent=2, ensure_ascii=False)
 
@@ -3125,6 +3309,9 @@ def main(argv):
             if "menus" in r:
                 log(f"- {r['scenario']} : sous-menus et vue « All tools » étendue (EVORA-COL-58) : "
                     + json.dumps(r["menus"], ensure_ascii=False)[:2400])
+            if "saisie" in r:
+                log(f"- {r['scenario']} : enregistrements pendant la saisie (EVORA-COL-63, F4) : "
+                    + json.dumps(r["saisie"], ensure_ascii=False)[:2400])
             if "accuse" in r:
                 log(f"- {r['scenario']} : demande d'enregistrement et accusé (COL-08, COL-09) : "
                     + json.dumps({k: v for k, v in r["accuse"].items() if k != "messages"}, ensure_ascii=False)[:2400])
