@@ -859,7 +859,15 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
             }
             // Evora (EVORA-COL-63): an indirect font, see `crate::standard_font`.
             let encoded = t.family != Family::Courier || !t.text.is_ascii();
-            fonts.set(name.clone().into_bytes(), crate::standard_font(doc, taken.get(name.as_bytes()), base, encoded));
+            // TÉMOIN SABORDÉ (EVORA-COL-66, S3) : la police standard écrite directement dans les ressources.
+            let mut font = Dict::new();
+            font.set(b"Type".to_vec(), Object::name("Font"));
+            font.set(b"Subtype".to_vec(), Object::name("Type1"));
+            font.set(b"BaseFont".to_vec(), Object::name(base));
+            if encoded {
+                font.set(b"Encoding".to_vec(), Object::name("WinAnsiEncoding"));
+            }
+            fonts.set(name.clone().into_bytes(), Object::Dict(font));
             let face_or_new = |has: fn(char) -> bool, face: bool| t.text.chars().any(has) && (face || !existing);
             if t.text.chars().any(is_thai)
                 || face_or_new(is_arabic, pdfcraft_fonts::document_arabic_font().is_some())

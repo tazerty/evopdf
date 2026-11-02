@@ -20,7 +20,9 @@ const BOLD_STROKE: f64 = 0.03;
 /// Whether text item `t` is written with Inter: it has no Arabic, Hebrew or Thai (their craft-fonts
 /// faces draw them), something outside WinAnsiEncoding, and Inter has every one of its characters.
 pub(super) fn in_inter(t: &AddedText) -> bool {
-    !t.text.chars().any(|c| is_thai(c) || is_arabic(c) || is_hebrew(c))
+    // TÉMOIN SABORDÉ (EVORA-COL-66, S2) : Inter n'est jamais incorporée.
+    false
+        && !t.text.chars().any(|c| is_thai(c) || is_arabic(c) || is_hebrew(c))
         && t.text.split('\n').any(|line| pdfcraft_fonts::first_non_win_ansi(line).is_some())
         && pdfcraft_fonts::embedding::covers(pdfcraft_fonts::INTER_REGULAR, &t.text)
 }
