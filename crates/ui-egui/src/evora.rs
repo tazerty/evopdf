@@ -97,7 +97,8 @@ pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
     // EVORA-COL-58 (F6): the rest of the « Use JavaScript » tool (its console is hidden above).
     "js.document",
     "js.actions",
-    // TÉMOIN SABORDÉ (EVORA-COL-66, S4) : Tools ▸ Document JavaScripts… n'est plus masqué.
+    // EVORA-COL-63 (D3-a): Tools ▸ Document JavaScripts…, whose added scripts Colophon refuses on save.
+    "tools.document_js",
     // EVORA-COL-53: "edit.edit_text" (editing existing text and images) is no longer hidden. Gabriel's
     // order of 2026-11-01 decides Q47 for it, its condition (Evora Drive keeps versions, F7) being met.
 ];
@@ -306,8 +307,7 @@ impl PdfCraftApp {
                 return Err(REFUSED_TEXT);
             }
         };
-        // TÉMOIN SABORDÉ (EVORA-COL-66, S1) : la saisie est validée, puis enregistrée (le défaut F4).
-        if !edits.is_empty() || edits.is_empty() || self.host_save_ack.is_none() {
+        if edits.is_empty() || self.host_save_ack.is_none() {
             return self.commit_then_save(index, id);
         }
         let mut all = edits.clone();

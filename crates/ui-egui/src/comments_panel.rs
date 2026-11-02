@@ -489,8 +489,7 @@ fn card(
                 view.comments.open_editor(a.page, a.index, a.contents.clone().unwrap_or_default());
                 ui.close();
             }
-            // TÉMOIN SABORDÉ (EVORA-COL-66, S5) : sous-menu d'egui appelé hors de evora.rs.
-            ui.menu_button(tl!("Set status"), |ui| {
+            crate::evora::menu_button(ui, tl!("Set status"), |ui| {
                 for s in [ReviewState::None, ReviewState::Accepted, ReviewState::Cancelled, ReviewState::Completed, ReviewState::Rejected] {
                     if ui.button(tl!(s.name())).clicked() {
                         edit = Some(Edit::SetAnnotationStatus { page: a.page, index: a.index, state: s, author: prefs.author.clone() });
