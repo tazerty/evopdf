@@ -352,15 +352,16 @@ impl PdfCraftApp {
     }
 
     /// CI only (the web bridge's `window.__evoraRun`, `?evora-audit=1`): Add text typing without a
-    /// keyboard, in the active tab: with `start`, a new text box on page 1 holding `text`, on the
-    /// keyboard, the Add text tool picked; otherwise `text` typed at the end of the open box.
-    /// Returns whether it did.
+    /// keyboard, in the active tab: with `start`, a new text box on page 1 holding `text`, the Add text
+    /// tool picked; otherwise `text` typed at the end of the open box. Returns whether it did. The box
+    /// doesn't ask for the keyboard (EVORA-COL-64): the test's page has none to give, and a box that
+    /// takes the keyboard and loses it at once is committed (`content_ui::editor`).
     pub fn evora_ci_type(&mut self, text: &str, start: bool) -> bool {
         let Some(i) = self.active else { return false };
         let Some(view) = self.views.get_mut(i) else { return false };
         if start {
             let style = pdfcraft_engine::AddedText { size: 14.0, ..Default::default() };
-            let draft = crate::content_ui::TextDraft { page: 0, index: None, rect: [24.0, 60.0, 280.0, 80.0], text: text.to_string(), style, focus: true };
+            let draft = crate::content_ui::TextDraft { page: 0, index: None, rect: [24.0, 60.0, 280.0, 80.0], text: text.to_string(), style, focus: false };
             view.content.draft = Some(draft);
             self.quick_tool = QuickTool::AddText;
             return true;

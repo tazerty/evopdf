@@ -2927,7 +2927,9 @@ def run_finitions(chrome, page, contexts, result, errors):
 # evora-ci.type-more ; textes fixes du pont, PROBE_TYPED et PROBE_TYPED_MORE), Evora demande une reprise automatique
 # PUIS, au milieu, un enregistrement à la perte de visibilité de l'onglet. Détecteurs : [saisie-octets] chaque
 # enregistrement porte tout le texte tapé jusque-là (flux de contenu décompressés), [saisie-editeur] la zone de texte
-# reste ouverte, avec tout le texte, après les deux enregistrements (audit au rendu : texte dessiné à l'instant).
+# reste ouverte, avec tout le texte, l'outil Add text inchangé, après les deux enregistrements. EVORA-COL-64 : l'état
+# est lu dans le moteur (window.__evoraTyping {draft, tool}, sonde CI du pont) ; le rendu de la zone (audit, texte
+# dessiné à l'instant) est relevé à côté, sans être juge : au run 41482361383, la zone n'y est jamais apparue.
 SAISIE_DOC = "01JX" + "X" * 20 + "S1"
 SAISIE_NAME = "evora-saisie.pdf"
 SAISIE_TYPED = "Ligne ajoutée dans Col"
@@ -3050,23 +3052,25 @@ def run_saisie(chrome, page, engine, contexts, result, errors):
         bench.settle(1.5)
         return done is True
 
-    def drawn(probe):
+    def typing(label, probe):
         a = json.loads(bench.evaluate("JSON.stringify(window.__evoraAudit || null)", sess, ctx) or "null") or {}
-        return int((a.get("exact_now") or {}).get(probe) or 0)
+        t = json.loads(bench.evaluate("JSON.stringify(window.__evoraTyping || null)", sess, ctx) or "null") or {}
+        sai[label] = {"zone": t.get("draft"), "outil": t.get("tool"), "onglets": t.get("tabs"), "devant": t.get("active"),
+                      "dessinee": int((a.get("exact_now") or {}).get(probe) or 0)}
+        return sai[label]
 
     if not type_("evora-ci.type"):
         return
-    sai["zone_ouverte"] = drawn(SAISIE_TYPED)
-    if sai["zone_ouverte"] < 1:
-        errors.append(f"[banc] zone de texte « {SAISIE_TYPED} » non dessinée après la sonde (mesure impossible)")
+    if typing("avant", SAISIE_TYPED)["zone"] != SAISIE_TYPED:
+        errors.append(f"[banc] zone de texte du moteur après la sonde : {sai['avant']} (attendue : {SAISIE_TYPED!r}, mesure impossible)")
         return
     saisie_save(bench, engine, "autosave", 2, SAISIE_TYPED, sai, errors)
     type_("evora-ci.type-more")
     saisie_save(bench, engine, "visibility", 3, SAISIE_TYPED + SAISIE_MORE, sai, errors)
-    sai["zone_apres"] = drawn(SAISIE_TYPED + SAISIE_MORE)
-    if sai["zone_apres"] < 1:
-        errors.append(f"[saisie-editeur] après les enregistrements, zone de texte « {SAISIE_TYPED + SAISIE_MORE} » "
-                      f"non dessinée ({sai['zone_apres']} fois) : la saisie a été coupée")
+    after = typing("apres", SAISIE_TYPED + SAISIE_MORE)
+    if after["zone"] != SAISIE_TYPED + SAISIE_MORE or after["outil"] != "AddText":
+        errors.append(f"[saisie-editeur] après les enregistrements : zone {after['zone']!r}, outil {after['outil']!r} "
+                      f"(attendus : {SAISIE_TYPED + SAISIE_MORE!r}, AddText) : la saisie a été coupée")
 
 
 def error_tags(errors):

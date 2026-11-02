@@ -1365,6 +1365,28 @@ mod ehp {
         }
     }
 
+    /// CI only (EVORA-COL-64, `?evora-audit=1`): whether the smoke test's audit is on.
+    pub fn audit_on() -> bool {
+        static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *ON.get_or_init(|| crate::query_param("evora-audit").as_deref() == Some("1"))
+    }
+
+    /// CI only (EVORA-COL-64, scenario « pont-saisie »): `window.__evoraTyping` {draft, tool, tabs, active},
+    /// the text being typed with Add text in the front tab (`null`: no box open), the page tool, the tabs
+    /// open and the front one, read back by the smoke test after Evora's saves: the engine's state, whatever
+    /// the page's rendering shows.
+    pub fn publish_typing(draft: Option<&str>, tool: &str, tabs: usize, active: Option<usize>) {
+        let Some(window) = web_sys::window() else { return };
+        let report = js_sys::Object::new();
+        let draft = draft.map_or(JsValue::NULL, JsValue::from_str);
+        let active = active.map_or(JsValue::NULL, |i| JsValue::from_f64(i as f64));
+        let _ = js_sys::Reflect::set(&report, &JsValue::from_str("draft"), &draft);
+        let _ = js_sys::Reflect::set(&report, &JsValue::from_str("tool"), &JsValue::from_str(tool));
+        let _ = js_sys::Reflect::set(&report, &JsValue::from_str("tabs"), &JsValue::from_f64(tabs as f64));
+        let _ = js_sys::Reflect::set(&report, &JsValue::from_str("active"), &active);
+        let _ = js_sys::Reflect::set(&window, &JsValue::from_str("__evoraTyping"), &report);
+    }
+
     /// CI only (`?host=evora&evora-audit=1`): `window.__evoraRun("page.rotate")` queues one of
     /// [`PROBE_COMMANDS`] for the next frame and returns whether it did. That is how the smoke test
     /// edits the open document (S-ACK scenarios) without driving the menus.
@@ -2290,6 +2312,11 @@ impl eframe::App for EvoraApp {
         // COL-40 (correction 1): nothing dropped or picked opens under the host document's prompt.
         self.hold_local_opens();
         eframe::App::logic(&mut self.inner, ctx, frame);
+        // CI only (EVORA-COL-64): the typing the smoke test reads back (scenario « pont-saisie »).
+        if self.link.is_some() && ehp::audit_on() {
+            let draft = self.inner.active.and_then(|i| self.inner.views.get(i)).and_then(|v| v.content.draft.as_ref()).map(|d| d.text.as_str());
+            ehp::publish_typing(draft, &format!("{:?}", self.inner.quick_tool), self.inner.views.len(), self.inner.active);
+        }
         // COL-43: the catalog, once the host's language is applied (`evora:init`, `evora:lang`).
         if std::mem::take(&mut self.catalog_due)
             && let Some(link) = &self.link
