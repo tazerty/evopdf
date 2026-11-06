@@ -257,7 +257,7 @@ fn claim_at(path: &std::path::Path, files: &[String], may_hand_off: bool) -> Cla
                     }
                 };
             }
-            // Nobody is listening: no socket yet, or one left by a EvoPdf that didn't exit
+            // Nobody is listening: no socket yet, or one left by an EvoPdf that didn't exit
             // cleanly (connecting to it is refused). Clear it and become the first. Removed
             // without asking `path.exists()` first: on Windows that follows the socket's reparse
             // point, which can fail, and a leftover socket would then block every later start.

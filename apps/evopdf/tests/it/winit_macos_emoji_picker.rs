@@ -4,7 +4,7 @@
 fn winit_commits_macos_text_inserted_outside_a_key_press() {
     // The macOS emoji picker inserts its text with `insertText` outside any key press and without
     // a composition. winit 0.30.13 reports `insertText` only as part of a key press or a
-    // composition, so an emoji picked into a EvoPdf text field was dropped. vendor/winit commits
+    // composition, so an emoji picked into an EvoPdf text field was dropped. vendor/winit commits
     // such text (rust-windowing/winit#4749, the 0.30 backport of #4748). A re-vendored copy without
     // the patch would silently bring the bug back: re-apply the patch, or drop the copy once a winit
     // 0.30 release has the fix.

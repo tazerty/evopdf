@@ -2083,7 +2083,7 @@ fn a_caption_from_rich_text_and_one_the_font_cant_draw() {
     assert!(s.windows(17).any(|w| w == b"(Dim & 50 mm <x>)"), "{}", String::from_utf8_lossy(&s));
     let cjk = table_178_line([0.0, 0.0, 100.0, 0.0], &[("Cap", Object::Bool(true)), ("Contents", Object::String(PdfString::text("長さ")))]);
     assert_eq!(crate::appearance::undrawable_text(&cjk), Some(("the line's caption", '長')));
-    // A EvoPdf measurement's label is its caption: the comment text isn't drawn a second time.
+    // An EvoPdf measurement's label is its caption: the comment text isn't drawn a second time.
     let mut measured = cjk.clone();
     measured.set(b"PCMeasureValue".to_vec(), Object::String(PdfString::text("5 mm")));
     assert_eq!(crate::appearance::undrawable_text(&measured), None);

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Repackage a EvoPdf Linux tarball as a single-file Flatpak bundle:
+# Repackage an EvoPdf Linux tarball as a single-file Flatpak bundle:
 #
 #   $DIST/evopdf-<version>-linux-<arch>.flatpak
 #

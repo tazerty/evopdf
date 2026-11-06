@@ -9,3 +9,7 @@ plan/
 /assets/models
 # A evo-fonts checkout used as the optional EVO_FONTS_DIR build input (CI and releases put it here).
 /evo-fonts
+
+# Bytecode Python : ni suivi ni publié (il garde les constantes des portes en clair).
+__pycache__/
+*.pyc
