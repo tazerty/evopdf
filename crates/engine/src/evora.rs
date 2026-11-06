@@ -25,7 +25,7 @@ impl Session {
             self.preview_edit(doc, editor, &mut next, edit)?;
         }
         // As `Session::apply`: a signed document is only ever saved incrementally.
-        let rewrites = |c: &pdfcraft_cos::Document| c.full_save_required() || c.encryption_changed();
+        let rewrites = |c: &evopdf_cos::Document| c.full_save_required() || c.encryption_changed();
         if doc.is_signed() && ((rewrites(&next) && !rewrites(&editor.cos)) || (next.is_modified() && next.revisions().is_empty())) {
             return Err(EditError::SignedRewrite(edits.first().map(|e| e.label().to_string()).unwrap_or_default()));
         }
@@ -34,12 +34,12 @@ impl Session {
 
     /// `edit` applied to `next`, a copy of document `doc`'s graph, as `Session::apply` applies it:
     /// the document's permissions, an OCR word's cover, field scripts, and an XFA form's data.
-    fn preview_edit(&self, doc: &Document, editor: &Editor, next: &mut pdfcraft_cos::Document, edit: &Edit) -> Result<(), EditError> {
+    fn preview_edit(&self, doc: &Document, editor: &Editor, next: &mut evopdf_cos::Document, edit: &Edit) -> Result<(), EditError> {
         if let Some(p) = next.permissions() {
             check_permission(edit, &p)?;
         }
         // Nothing to bake: as `Session::apply`, which leaves the document alone.
-        if matches!(edit, Edit::FlattenFillSign) && !pdfcraft_annot::has_visible_fill_sign(next) {
+        if matches!(edit, Edit::FlattenFillSign) && !evopdf_annot::has_visible_fill_sign(next) {
             return Ok(());
         }
         let edit = covered(doc, editor, edit.clone());

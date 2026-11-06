@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object, SaveOptions, Stream, write_full};
-use pdfcraft_filters::{Filter, Params};
-use pdfcraft_optimize::{
+use evopdf_cos::{Dict, Document, ObjRef, Object, SaveOptions, Stream, write_full};
+use evopdf_filters::{Filter, Params};
+use evopdf_optimize::{
     Compatibility, Compression, ImageSettings, OptimizeError, Settings, SpaceCategory, audit_space, effective_resolutions, optimize,
 };
 
@@ -87,7 +87,7 @@ fn image_resolution_uses_the_pages_physical_unit() {
         (Some(Object::Int(-10)), 1.0),
         (Some(Object::Real(0.5)), 1.0),
         (Some(Object::name("Ten")), 1.0),
-        (Some(Object::Int(100_000)), pdfcraft_model::MAX_USER_UNIT),
+        (Some(Object::Int(100_000)), evopdf_model::MAX_USER_UNIT),
     ] {
         for indirect in [false, true] {
             let mut doc = Document::new_empty();
@@ -148,7 +148,7 @@ fn images_are_measured_where_drawn_and_downsampled() {
         &[("A", masked), ("B", photo), ("C", twice)],
         "q 72 0 0 72 36 36 cm /A Do Q q 1 0 0 1 100 100 cm 600 0 0 400 0 0 cm /B Do Q q 72 0 0 72 0 0 cm /C Do Q q 288 0 0 288 300 300 cm /C Do Q",
     );
-    let pages = pdfcraft_annot::page_refs(&doc).unwrap();
+    let pages = evopdf_annot::page_refs(&doc).unwrap();
     let ppi = effective_resolutions(&doc, &pages);
     assert_eq!(ppi[&big].round(), 600.0);
     assert_eq!(ppi[&small].round(), 50.0);
@@ -176,9 +176,9 @@ fn images_are_measured_where_drawn_and_downsampled() {
 
     // The optimized file opens, and the page still shows the picture where it was.
     let reopened = Document::open(Arc::new(after_bytes.clone())).unwrap();
-    assert_eq!(pdfcraft_annot::page_refs(&reopened).unwrap().len(), 2);
-    let mut r = pdfcraft_render::PageRenderer::new(Arc::new(after_bytes), pdfcraft_render::RenderConfig::default());
-    let out = r.render(pdfcraft_render::RenderRequest { page: 0, scale: 1.0, ..Default::default() });
+    assert_eq!(evopdf_annot::page_refs(&reopened).unwrap().len(), 2);
+    let mut r = evopdf_render::PageRenderer::new(Arc::new(after_bytes), evopdf_render::RenderConfig::default());
+    let out = r.render(evopdf_render::RenderRequest { page: 0, scale: 1.0, ..Default::default() });
     assert!(out.error.is_none(), "{:?}", out.error);
     // Top-left image area (36..180 x 600..744 user → y from the top 48..192): drawn, not white.
     let i = ((100 * out.width + 100) * 4) as usize;
@@ -405,7 +405,7 @@ fn invalid_links_and_unreferenced_destinations_go() {
         d.set(b"Dest".to_vec(), dest);
         Object::Ref(doc.add(Object::Dict(d)))
     };
-    let s = |t: &str| Object::String(pdfcraft_cos::PdfString::literal(t.as_bytes().to_vec()));
+    let s = |t: &str| Object::String(evopdf_cos::PdfString::literal(t.as_bytes().to_vec()));
     let annots = vec![
         link(&mut doc, Object::Array(vec![Object::Ref(p), Object::name("Fit")])),
         link(&mut doc, Object::Array(vec![Object::Ref(ObjRef::new(999, 0)), Object::name("Fit")])),
@@ -449,7 +449,7 @@ fn invalid_links_and_unreferenced_destinations_go() {
 
 #[test]
 fn progress_is_reported_per_image_and_a_refusal_cancels() {
-    use pdfcraft_optimize::{OptimizeError, Stage, optimize_with_progress};
+    use evopdf_optimize::{OptimizeError, Stage, optimize_with_progress};
     let build = || {
         let mut doc = Document::new_empty();
         let a = image(&mut doc, 300, 300, 3, false, None);
@@ -885,7 +885,7 @@ fn printed_page(rows: usize, jpeg: impl Fn(usize) -> bool, edit: impl Fn(usize, 
 
 /// The images the first page's content stream draws, by name, with their streams.
 fn drawn_images(doc: &Document) -> Vec<Stream> {
-    let pages = pdfcraft_annot::page_refs(doc).unwrap();
+    let pages = evopdf_annot::page_refs(doc).unwrap();
     let p = doc.get(pages[0]).as_dict().cloned().unwrap();
     let res = doc.resolve(p.get(b"Resources").unwrap()).as_dict().cloned().unwrap();
     let xo = doc.resolve(res.get(b"XObject").unwrap()).as_dict().cloned().unwrap();
@@ -893,7 +893,7 @@ fn drawn_images(doc: &Document) -> Vec<Stream> {
         Object::Stream(s) => s.decoded().unwrap(),
         _ => panic!("contents"),
     };
-    pdfcraft_content::parse(&c)
+    evopdf_content::parse(&c)
         .ops
         .iter()
         .filter(|o| o.is("Do"))
@@ -928,7 +928,7 @@ fn a_page_picture_printed_as_one_pixel_strips_is_merged_into_one_image() {
 
 #[test]
 fn the_mobile_preset_makes_a_printed_page_small() {
-    use pdfcraft_optimize::Preset;
+    use evopdf_optimize::Preset;
     let (doc, _) = printed_page(200, |_| true, |_, s| s);
     let bytes = |d: &Document| write_full(d, &SaveOptions::default()).unwrap().len();
     let before = bytes(&doc);
@@ -1009,7 +1009,7 @@ fn a_deeply_nested_form_is_measured_at_its_largest_use() {
             for c in &pages {
                 page(&mut doc, &[("F", outer)], c);
             }
-            let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+            let refs = evopdf_annot::page_refs(&doc).unwrap();
             assert_eq!(effective_resolutions(&doc, &refs)[&img].round(), 150.0, "{levels} levels, {label}");
             optimize(&mut doc, &Settings::default()).unwrap();
             assert_eq!(stream(&doc, img).dict.int(b"Width"), Some(1200), "{levels} levels, {label}");
@@ -1031,7 +1031,7 @@ fn a_form_drawing_itself_is_walked_once_per_use() {
     d.dict.set(b"Resources".to_vec(), Object::Dict(resources(x)));
     doc.set(f, Object::Stream(d));
     page(&mut doc, &[("F", f)], "q 72 0 0 72 36 36 cm /F Do Q");
-    let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+    let refs = evopdf_annot::page_refs(&doc).unwrap();
     // Only the outer use: the cycle isn't followed, and doesn't count as a missed use.
     assert_eq!(effective_resolutions(&doc, &refs)[&img].round(), 1200.0);
 }
@@ -1052,7 +1052,7 @@ fn a_shared_form_without_resources_draws_each_callers_image() {
         outers.push(inner);
     }
     page(&mut doc, &[("A", outers[0]), ("B", outers[1])], "q 72 0 0 72 36 36 cm /A Do Q q 576 0 0 576 18 100 cm /B Do Q");
-    let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+    let refs = evopdf_annot::page_refs(&doc).unwrap();
     let ppi = effective_resolutions(&doc, &refs);
     assert_eq!(ppi[&a].round(), 1200.0);
     assert_eq!(ppi.get(&b).map(|p| p.round()), Some(150.0));
@@ -1070,7 +1070,7 @@ fn images_are_not_resampled_when_some_uses_could_not_be_measured() {
         &[("F", deep), ("Im", img), ("O", other)],
         "q 72 0 0 72 36 36 cm /Im Do Q q 72 0 0 72 200 36 cm /O Do Q q 576 0 0 576 18 100 cm /F Do Q",
     );
-    let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+    let refs = evopdf_annot::page_refs(&doc).unwrap();
     let ppi = effective_resolutions(&doc, &refs);
     assert_eq!((ppi[&img], ppi[&other]), (f64::INFINITY, f64::INFINITY));
     optimize(&mut doc, &Settings::default()).unwrap();
@@ -1090,7 +1090,7 @@ fn images_are_not_resampled_when_some_uses_could_not_be_measured() {
         next = label;
     }
     page(&mut doc, &names, "q 72 0 0 72 36 36 cm /F1 Do Q");
-    let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+    let refs = evopdf_annot::page_refs(&doc).unwrap();
     assert_eq!(effective_resolutions(&doc, &refs)[&img], f64::INFINITY);
 }
 
@@ -1101,9 +1101,9 @@ fn images_are_not_resampled_when_a_page_enters_more_forms_than_allowed() {
     let mut doc = Document::new_empty();
     let img = image(&mut doc, 1200, 1200, 3, false, None);
     let empty = form(&mut doc, None, "");
-    let draws = "/E Do ".repeat(pdfcraft_cos::MAX_PAGE_FORMS + 1);
+    let draws = "/E Do ".repeat(evopdf_cos::MAX_PAGE_FORMS + 1);
     page(&mut doc, &[("E", empty), ("Im", img)], &format!("q 72 0 0 72 36 36 cm /Im Do Q {draws}"));
-    let refs = pdfcraft_annot::page_refs(&doc).unwrap();
+    let refs = evopdf_annot::page_refs(&doc).unwrap();
     assert_eq!(effective_resolutions(&doc, &refs)[&img], f64::INFINITY);
 }
 
@@ -1130,7 +1130,7 @@ fn compatibility_level_sets_version_unpacks_for_1_4_and_checks_encryption() {
         assert!(bytes.starts_with(format!("%PDF-{expected}\n").as_bytes()), "{expected}");
         let has_objstm = bytes.windows(7).any(|w| w == b"/ObjStm");
         assert_eq!(has_objstm, compat != Compatibility::Pdf1_4, "{compat:?}");
-        let info = pdfcraft_render::inspect(Arc::new(bytes), None).unwrap();
+        let info = evopdf_render::inspect(Arc::new(bytes), None).unwrap();
         assert_eq!(info.pdf_version, expected);
     }
 
@@ -1144,8 +1144,8 @@ fn compatibility_level_sets_version_unpacks_for_1_4_and_checks_encryption() {
     // Encryption that requires a newer PDF version than the chosen compatibility is refused.
     let mut aes256 = base.clone();
     aes256
-        .set_encryption(&pdfcraft_cos::NewEncryption {
-            algorithm: pdfcraft_cos::Algorithm::Aes256,
+        .set_encryption(&evopdf_cos::NewEncryption {
+            algorithm: evopdf_cos::Algorithm::Aes256,
             user_password: "u",
             owner_password: "o",
             permissions: -1,
@@ -1162,8 +1162,8 @@ fn compatibility_level_sets_version_unpacks_for_1_4_and_checks_encryption() {
 
     let mut aes128 = base;
     aes128
-        .set_encryption(&pdfcraft_cos::NewEncryption {
-            algorithm: pdfcraft_cos::Algorithm::Aes128,
+        .set_encryption(&evopdf_cos::NewEncryption {
+            algorithm: evopdf_cos::Algorithm::Aes128,
             user_password: "u",
             owner_password: "o",
             permissions: -1,
@@ -1247,7 +1247,7 @@ fn indirectly_referenced_destination_is_kept() {
     // used, silently breaking the link.
     let mut doc = Document::new_empty();
     let p = page(&mut doc, &[], "BT ET");
-    let s = |t: &str| Object::String(pdfcraft_cos::PdfString::literal(t.as_bytes().to_vec()));
+    let s = |t: &str| Object::String(evopdf_cos::PdfString::literal(t.as_bytes().to_vec()));
     // A link whose /Dest is `ref -> "target"`, and an unused destination for contrast.
     let name_ref = Object::Ref(doc.add(s("target")));
     let mut link = Dict::new();
@@ -1279,7 +1279,7 @@ fn a_destination_named_only_by_a_remote_or_embedded_go_to_is_removed() {
     // destination of the same name that nothing else uses is unreferenced.
     let mut doc = Document::new_empty();
     let p = page(&mut doc, &[], "BT ET");
-    let s = |t: &str| Object::String(pdfcraft_cos::PdfString::literal(t.as_bytes().to_vec()));
+    let s = |t: &str| Object::String(evopdf_cos::PdfString::literal(t.as_bytes().to_vec()));
     let link = |doc: &mut Document, action: Dict| {
         let mut link = Dict::new();
         link.set(b"Type".to_vec(), Object::name("Annot"));
@@ -1332,7 +1332,7 @@ fn lzw_ops() -> Vec<u8> {
 }
 
 fn lzw(data: &[u8], params: &Params) -> Vec<u8> {
-    pdfcraft_filters::encode(&Filter::Lzw, params, data).unwrap()
+    evopdf_filters::encode(&Filter::Lzw, params, data).unwrap()
 }
 
 /// `params` as a `/DecodeParms` dictionary, only the entries that differ from the defaults.
@@ -1395,7 +1395,7 @@ fn lzw_streams_become_flate_and_decode_to_the_same_bytes() {
     let (img, px) = lzw_image(&mut doc, &png);
     let (img_late, _) = lzw_image(&mut doc, &png_late);
     page(&mut doc, &[("Im", img), ("Im2", img_late)], "q 64 0 0 48 72 600 cm /Im Do Q q 64 0 0 48 172 600 cm /Im2 Do Q");
-    let pg = pdfcraft_annot::page_refs(&doc).unwrap()[0];
+    let pg = evopdf_annot::page_refs(&doc).unwrap()[0];
     doc.update_dict(pg, |d| {
         d.set(b"Contents".to_vec(), Object::Array(vec![Object::Ref(c_early), Object::Ref(c_late), d.get(b"Contents").unwrap().clone()]))
     })
@@ -1435,8 +1435,8 @@ fn a_page_drawn_from_lzw_streams_renders_the_same_after_conversion() {
     doc.update_dict(pg, |p| p.set(b"Contents".to_vec(), Object::Ref(c))).unwrap();
     let render = |doc: &Document| {
         let bytes = write_full(doc, &SaveOptions::default()).unwrap();
-        let mut r = pdfcraft_render::PageRenderer::new(Arc::new(bytes), pdfcraft_render::RenderConfig::default());
-        let out = r.render(pdfcraft_render::RenderRequest { page: 0, scale: 1.0, ..Default::default() });
+        let mut r = evopdf_render::PageRenderer::new(Arc::new(bytes), evopdf_render::RenderConfig::default());
+        let out = r.render(evopdf_render::RenderRequest { page: 0, scale: 1.0, ..Default::default() });
         assert!(out.error.is_none(), "{:?}", out.error);
         out.rgba
     };
@@ -1480,7 +1480,7 @@ fn lzw_inside_a_filter_chain_is_replaced_and_the_other_stages_kept() {
     let after = stream(&doc, pic);
     assert_eq!(after.dict.get(b"Filter"), Some(&Object::Array(vec![Object::name("FlateDecode"), Object::name("DCTDecode")])));
     assert!(!after.dict.contains(b"DecodeParms"), "all null: dropped");
-    let inside = pdfcraft_filters::decode(&[(Filter::Flate, Params::default())], &after.raw, 1 << 20).unwrap();
+    let inside = evopdf_filters::decode(&[(Filter::Flate, Params::default())], &after.raw, 1 << 20).unwrap();
     assert_eq!(inside, jpeg, "the JPEG bytes are kept exactly");
 }
 
@@ -1513,7 +1513,7 @@ fn lzw_streams_that_cannot_be_read_or_are_not_asked_for_stay_unchanged() {
     let mut objstm = filtered(&["LZWDecode"], good.clone());
     objstm.dict.set(b"Type".to_vec(), Object::name("ObjStm"));
     let mut external = filtered(&["LZWDecode"], good.clone());
-    external.dict.set(b"F".to_vec(), Object::String(pdfcraft_cos::PdfString::literal(b"data.bin".to_vec())));
+    external.dict.set(b"F".to_vec(), Object::String(evopdf_cos::PdfString::literal(b"data.bin".to_vec())));
     let cases = [
         ("corrupt LZW", filtered(&["LZWDecode"], corrupt), Settings::default()),
         ("corrupt under a PNG predictor", bad_predictor, Settings::default()),

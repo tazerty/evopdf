@@ -1,4 +1,4 @@
-# pdfcraft-optimize
+# evopdf-optimize
 
 Layer L4: the PDF Optimizer (execution plan M11.1; Acrobat's Reduce File Size and Optimize PDF ▸
 Advanced optimization).
@@ -41,9 +41,9 @@ let report = optimize_with_progress(&mut doc, &settings, &mut |stage| keep_going
   `EarlyChange`, filters applied before the LZW one go with it and those after it keep their
   bytes. A stream whose LZW data doesn't decode cleanly is left as it is. Not yet: inline images.
 
-The engine runs Remove Hidden Information (`pdfcraft-redact`) for the user-data categories,
+The engine runs Remove Hidden Information (`evopdf-redact`) for the user-data categories,
 then this, then merges identical objects and writes a full, compressed save
-(`pdfcraft_engine::optimizer::OptimizeJob`, which the UI runs on a worker thread with a
+(`evopdf_engine::optimizer::OptimizeJob`, which the UI runs on a worker thread with a
 progress bar). JPEG decoding comes from `zune-jpeg` (the decoder behind `image` and the
 renderer), JPEG encoding and resampling from the `image` crate.
 

@@ -1,17 +1,17 @@
-//! Where PdfCraft and the ArtCraft community live on the web. One table, so the Help menu, the
+//! Where EvoPdf and the Upstream community live on the web. One table, so the Help menu, the
 //! About dialog, the home screen, the CLI and the README agree.
 
 use icu_properties::props::Script;
 use std::path::{Path, PathBuf};
 
-/// The app's name in ArtCraft URLs (`getartcraft.com/apps/{APP}`, `github.com/storytold/{APP}`).
-pub const APP: &str = "pdfcraft";
+/// The app's name in Upstream URLs (`upstream-site.com/apps/{APP}`, `github.com/storytold/{APP}`).
+pub const APP: &str = "evopdf";
 
-// Evora (EVORA-COL E1): the ArtCraft Discord and website links are removed. The ArtCraft name,
+// Evora (EVORA-COL E1): the Upstream Discord and website links are removed. The Upstream name,
 // logo and links are trademarks (docs/brand/LICENSE-brand.txt) that modified versions must drop;
-// the plain-text credit "based on PdfCraft by the ArtCraft Team" ships in the artefact's LICENSES/.
-pub const GITHUB: &str = "https://github.com/storytold/pdfcraft";
-/// The app's page: the source repository (the upstream web page was on the ArtCraft site).
+// the plain-text credit "based on EvoPdf by the Upstream Team" ships in the artefact's LICENSES/.
+pub const GITHUB: &str = "https://github.com/tazerty/evopdf";
+/// The app's page: the source repository (the upstream web page was on the Upstream site).
 pub const APP_PAGE: &str = GITHUB;
 
 /// A link and the registry command that opens it.
@@ -25,13 +25,13 @@ pub struct Link {
 }
 
 /// In the order they are shown.
-pub const LINKS: &[Link] = &[Link { command: "help.github", label: "PdfCraft on GitHub", url: GITHUB, icon: "code-xml" }];
+pub const LINKS: &[Link] = &[Link { command: "help.github", label: "EvoPdf on GitHub", url: GITHUB, icon: "code-xml" }];
 
 pub fn for_command(id: &str) -> Option<&'static Link> {
     LINKS.iter().find(|l| l.command == id)
 }
 
-/// The kinds of address a document may ask PdfCraft to open: web pages and email. Anything
+/// The kinds of address a document may ask EvoPdf to open: web pages and email. Anything
 /// else (`file:`, `javascript:`, `data:`, `smb:`, app handlers such as `ms-settings:`) is refused,
 /// because the operating system would hand it to whichever program claims it (#90, #91).
 pub const DOCUMENT_SCHEMES: &[&str] = &["https", "http", "mailto"];
@@ -85,8 +85,8 @@ fn hides_text(c: char) -> bool {
 }
 
 /// Check an address that came from a document (a link, a button's URI action or a script's
-/// `app.launchURL`) before PdfCraft offers to open it. Returns the address trimmed of
-/// surrounding whitespace. PdfCraft's own links (Help, About, updates) don't come through here.
+/// `app.launchURL`) before EvoPdf offers to open it. Returns the address trimmed of
+/// surrounding whitespace. EvoPdf's own links (Help, About, updates) don't come through here.
 pub fn document_url(raw: &str) -> Result<String, BlockedLink> {
     let url = raw.trim();
     if url.is_empty() {
@@ -135,7 +135,7 @@ pub enum RemoteDocumentPathError {
     TooLong,
     Hidden,
     /// A URL, a network or device path, or a path that climbs above its root.
-    NotLocal(craft_docpath::Refused),
+    NotLocal(evo_docpath::Refused),
     MissingSourcePath,
     /// The target doesn't end in `.pdf`.
     NotPdf,
@@ -173,7 +173,7 @@ pub fn remote_document_path_is_absolute(raw: &str) -> bool {
 /// Resolve a PDF remote-Go-To file specification to a local path without opening it.
 /// Relative paths are based on the source document, which should be an absolute path; an
 /// in-memory source has no fallback to CWD. URLs (including `file:`), network and device paths are
-/// refused ([`craft_docpath::resolve_absolute`]).
+/// refused ([`evo_docpath::resolve_absolute`]).
 pub fn resolve_remote_document_path(source: Option<&Path>, raw: &str) -> Result<PathBuf, RemoteDocumentPathError> {
     if raw.is_empty() || raw.trim().is_empty() {
         return Err(RemoteDocumentPathError::Empty);
@@ -191,13 +191,13 @@ pub fn resolve_remote_document_path(source: Option<&Path>, raw: &str) -> Result<
             && scheme.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
             && scheme.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'));
         if is_scheme {
-            return Err(RemoteDocumentPathError::NotLocal(craft_docpath::Refused::Url));
+            return Err(RemoteDocumentPathError::NotLocal(evo_docpath::Refused::Url));
         }
     }
-    craft_docpath::resolve_absolute(raw, source).map_err(|r| match r {
+    evo_docpath::resolve_absolute(raw, source).map_err(|r| match r {
         // A path that resolves but not to an absolute one needed a source with an absolute path. With
         // such a source, it is a path this platform cannot open (`C:\x.pdf` on Unix).
-        craft_docpath::Refused::Invalid if !source.is_some_and(Path::is_absolute) && craft_docpath::resolve(raw, source).is_ok() => {
+        evo_docpath::Refused::Invalid if !source.is_some_and(Path::is_absolute) && evo_docpath::resolve(raw, source).is_ok() => {
             RemoteDocumentPathError::MissingSourcePath
         }
         r => RemoteDocumentPathError::NotLocal(r),
@@ -254,7 +254,7 @@ const MAIL_DECODE_LAYERS: usize = 8;
 /// argument). The check is repeated after each layer of percent-decoding (KMail decodes names, so
 /// `%61ttach` is `attach`). A word without `=` (`Please attach the invoice`) is fine.
 ///
-/// The address is refused, not stripped of the parameter: PdfCraft never rewrites what a document
+/// The address is refused, not stripped of the parameter: EvoPdf never rewrites what a document
 /// asks to open, and a stripped address could still be read differently by some email app.
 fn check_mail_parameters(rest: &str) -> Result<(), BlockedLink> {
     let mut text = rest.to_string();
@@ -447,7 +447,7 @@ mod tests {
     #[test]
     fn remote_documents_must_be_regular_pdf_files() {
         use super::{RemoteDocumentPathError as E, read_remote_document as read};
-        let dir = std::env::temp_dir().join(format!("pdfcraft-gotor-read-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("evopdf-gotor-read-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("folder.pdf")).unwrap();
         std::fs::write(dir.join("doc.PDF"), b"%PDF-1.7\n").unwrap();
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!(resolve(None, "target.pdf"), Err(E::MissingSourcePath));
         assert_eq!(resolve(Some(Path::new("source.pdf")), "target.pdf"), Err(E::MissingSourcePath), "a relative source is not used");
         #[cfg(unix)]
-        assert_eq!(resolve(Some(source), "C:\\x.pdf"), Err(E::NotLocal(craft_docpath::Refused::Invalid)), "a Windows path on Unix needs no source");
+        assert_eq!(resolve(Some(source), "C:\\x.pdf"), Err(E::NotLocal(evo_docpath::Refused::Invalid)), "a Windows path on Unix needs no source");
         assert_eq!(resolve(Some(source), ""), Err(E::Empty));
         assert_eq!(resolve(Some(source), "   "), Err(E::Empty));
         for url in
@@ -522,7 +522,7 @@ mod tests {
         }
         assert_eq!(resolve(Some(source), "folder/hidden\u{200B}.pdf"), Err(E::Hidden));
         #[cfg(windows)]
-        assert_eq!(resolve(Some(source), "folder/a:b.pdf"), Err(E::NotLocal(craft_docpath::Refused::Invalid)));
+        assert_eq!(resolve(Some(source), "folder/a:b.pdf"), Err(E::NotLocal(evo_docpath::Refused::Invalid)));
         assert_eq!(resolve(Some(source), &"a".repeat(super::MAX_REMOTE_DOCUMENT_PATH_BYTES + 1)), Err(E::TooLong));
     }
 

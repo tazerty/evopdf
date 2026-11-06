@@ -2,10 +2,10 @@
 //! catalogue, with a fuzzy-ish substring match.
 
 use egui::{Align2, CornerRadius, Rect, Sense, Stroke, vec2};
-use pdfcraft_engine::catalog::Availability;
+use evopdf_engine::catalog::Availability;
 
 use crate::theme::{self, Tokens};
-use crate::{PdfCraftApp, icons};
+use crate::{EvoPdfApp, icons};
 
 struct Hit {
     /// The tool panel to open (tools and catalogue items); `None` for plain commands.
@@ -17,12 +17,12 @@ struct Hit {
     ready: bool,
 }
 
-/// Where `needle` (folded with [`pdfcraft_render::text::fold_case`]) matches `hay`, for ranking.
+/// Where `needle` (folded with [`evopdf_render::text::fold_case`]) matches `hay`, for ranking.
 fn score(hay: &str, needle: &str) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
-    let h = pdfcraft_render::text::fold_case(hay);
+    let h = evopdf_render::text::fold_case(hay);
     if let Some(p) = h.find(needle) {
         return Some(p);
     }
@@ -39,7 +39,7 @@ fn score(hay: &str, needle: &str) -> Option<usize> {
     needle.chars().all(|c| it.any(|x| x == c)).then_some(100)
 }
 
-pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
+pub fn show(app: &mut EvoPdfApp, ctx: &egui::Context) {
     let palette_rect_id = egui::Id::new("palette_rect");
     if !app.palette_open {
         return;
@@ -49,12 +49,12 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         app.palette_open = false;
         return;
     }
-    let q = pdfcraft_render::text::fold_case(app.palette_query.trim());
+    let q = evopdf_render::text::fold_case(app.palette_query.trim());
     let mut hits: Vec<(usize, Hit)> = Vec::new();
     let active = app.active_ids().map(|(_, id)| id);
     // Evora (E7): neutralised commands stay out of the palette.
-    for spec in pdfcraft_engine::commands::COMMANDS.iter().filter(|spec| !crate::evora::hidden(spec.id)) {
-        let label = pdfcraft_engine::commands::current_label(spec, &app.session, active);
+    for spec in evopdf_engine::commands::COMMANDS.iter().filter(|spec| !crate::evora::hidden(spec.id)) {
+        let label = evopdf_engine::commands::current_label(spec, &app.session, active);
         let translated = crate::i18n::command_label(&label);
         if let Some(s) = score(&translated, &q).or_else(|| score(&label, &q)).or_else(|| score(spec.id, &q).map(|s| s + 50)) {
             hits.push((
@@ -92,7 +92,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
         }
         for sec in g.sections {
             for i in sec.items {
-                if pdfcraft_engine::commands::command(i.command).is_some() || crate::evora::hidden(i.command) {
+                if evopdf_engine::commands::command(i.command).is_some() || crate::evora::hidden(i.command) {
                     continue; // listed above as a command, or hidden (Evora)
                 }
                 if let Some(s) = score(tl!(i.label), &q).or_else(|| score(i.label, &q)).or_else(|| score(i.command, &q).map(|s| s + 50)) {
@@ -231,7 +231,7 @@ pub fn show(app: &mut PdfCraftApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod search {
     use super::score;
-    use pdfcraft_render::text::fold_case;
+    use evopdf_render::text::fold_case;
 
     #[test]
     fn commands_match_in_any_case_with_turkish_i() {

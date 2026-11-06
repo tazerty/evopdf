@@ -1,17 +1,17 @@
 //! Editing glue: apply engine edits from the UI, undo/redo, save/save-as, and the
 //! "save changes?" prompt when closing a tab or quitting with unsaved edits.
 
-use pdfcraft_engine::Edit;
-use pdfcraft_platform::staging::{StagingName, staging_suffixes};
+use evopdf_engine::Edit;
+use evopdf_platform::staging::{StagingName, staging_suffixes};
 
-use crate::PdfCraftApp;
+use crate::EvoPdfApp;
 
 /// What the user was doing when we asked whether to save.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CloseRequest {
     /// Close this document's tab. By id, not tab index: tabs can close and shift while a save
     /// panel is open.
-    Tab(pdfcraft_engine::DocId),
+    Tab(evopdf_engine::DocId),
     /// Quit the application once every dirty document is resolved.
     Quit,
     /// File ▸ Close all: like Quit, but the application stays open.
@@ -22,11 +22,11 @@ pub enum CloseRequest {
 /// on disk is another version than the document came from (#2166).
 #[cfg(not(target_arch = "wasm32"))]
 pub struct PendingOverwrite {
-    pub id: pdfcraft_engine::DocId,
+    pub id: evopdf_engine::DocId,
     pub dest: String,
     target: SaveTarget,
     /// What was to run once the document is written (close its tab, quit).
-    after: Box<dyn FnOnce(&mut PdfCraftApp) + Send>,
+    after: Box<dyn FnOnce(&mut EvoPdfApp) + Send>,
 }
 
 /// Where Save writes.
@@ -43,7 +43,7 @@ fn new_text_typed(v: &crate::DocView) -> bool {
     v.content.draft.as_ref().is_some_and(|d| d.index.is_none() && !d.text.trim().is_empty())
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Apply an edit to the active document. Returns `true` on success; failures are shown.
     pub fn apply_edit(&mut self, edit: Edit) -> bool {
         let Some((i, id)) = self.active_ids() else { return false };
@@ -153,7 +153,7 @@ impl PdfCraftApp {
                     // A stroke drawn with the pen stays unselected, so the selection box and
                     // author popup don't sit over the next stroke (#429).
                     Edit::AddAnnotation(a)
-                        if matches!(a.shape, pdfcraft_engine::Shape::Ink { .. })
+                        if matches!(a.shape, evopdf_engine::Shape::Ink { .. })
                             && self.quick_tool == crate::QuickTool::Comment(crate::comments::CommentTool::Ink) =>
                     {
                         view.comments.selected = None;
@@ -165,7 +165,7 @@ impl PdfCraftApp {
                         view.comments.reveal = true;
                         // A new highlight opens its note for typing straight away, as in Acrobat,
                         // unless a note typed into another card is still unsaved.
-                        if let (pdfcraft_engine::Shape::TextMarkup { kind: pdfcraft_engine::Markup::Highlight, .. }, Some(n)) = (&a.shape, newest)
+                        if let (evopdf_engine::Shape::TextMarkup { kind: evopdf_engine::Markup::Highlight, .. }, Some(n)) = (&a.shape, newest)
                             && a.contents.is_empty()
                             && view.comments.editing.is_none()
                         {
@@ -305,7 +305,7 @@ impl PdfCraftApp {
     fn camera_level(&mut self, i: usize) {
         let Some(view) = self.views.get(i) else { return };
         let (id, Some(done)) = (view.id, view.camera_done) else { return };
-        let ours = |s: &pdfcraft_engine::Session, k: usize| {
+        let ours = |s: &evopdf_engine::Session, k: usize| {
             let label = s.get(id).and_then(|d| d.can_undo().map(str::to_owned));
             let want = if k + 1 == done.steps { "Enhance camera image" } else { "Rotate page" };
             label.as_deref() == Some(want)
@@ -432,7 +432,7 @@ impl PdfCraftApp {
         // Pasting into the document the pages came from is a duplicate (or, after Cut, a move):
         // its fields keep their names. Pasting into another document renames colliding ones.
         let field_conflicts =
-            if self.views[i].id == clip.from { pdfcraft_engine::FieldConflicts::Merge } else { pdfcraft_engine::FieldConflicts::Rename };
+            if self.views[i].id == clip.from { evopdf_engine::FieldConflicts::Merge } else { evopdf_engine::FieldConflicts::Rename };
         if self.apply_edit(Edit::InsertPagesFrom {
             name: clip.name.clone(),
             bytes: clip.bytes.clone(),
@@ -529,7 +529,7 @@ impl PdfCraftApp {
     /// [`Self::commit_form_typing`] for document `id`, which may not be the active tab (a save
     /// panel answering later, Close All). If its tab has typing or a queued edit, the tab is
     /// brought forward first, so the commit and any field scripts act on that document.
-    pub(crate) fn commit_typing_in(&mut self, id: pdfcraft_engine::DocId) -> bool {
+    pub(crate) fn commit_typing_in(&mut self, id: evopdf_engine::DocId) -> bool {
         let Some(i) = self.views.iter().position(|v| v.id == id) else { return true };
         // Added text the standard fonts can't draw can't be saved: show it rather than drop it.
         // Its page is brought into view, so the text, the warning and Discard are on screen.
@@ -565,7 +565,7 @@ impl PdfCraftApp {
     /// The Edit a PDF ▸ Text boxes (new text, and a paragraph open for editing) commit on
     /// click-away. Save does that first, so the typed text is in the file instead of being left
     /// open on the screen (#3496).
-    fn commit_open_text_edits(&mut self, id: pdfcraft_engine::DocId) -> bool {
+    fn commit_open_text_edits(&mut self, id: evopdf_engine::DocId) -> bool {
         let Some(doc) = self.session.get(id) else { return true };
         let Some(view) = self.views.iter_mut().find(|v| v.id == id) else { return true };
         // Both are taken out of the view before either edit runs, so keep what is needed to put
@@ -588,7 +588,7 @@ impl PdfCraftApp {
 
     /// The Fill & Sign type box commits on click-away. Save does that first, so the text is in
     /// the file (and can be flattened) instead of being left on the screen.
-    fn commit_open_fill_text(&mut self, id: pdfcraft_engine::DocId) -> bool {
+    fn commit_open_fill_text(&mut self, id: evopdf_engine::DocId) -> bool {
         let Some(i) = self.views.iter().position(|v| v.id == id) else { return true };
         let Some(tb) = self.views[i].fill_text.clone() else { return true };
         let text = tb.text.trim().to_string();
@@ -613,7 +613,7 @@ impl PdfCraftApp {
 
     /// When the preference is on, bake Fill & Sign marks before the bytes are written.
     /// Returns false when the document is not allowed to change (nothing is written).
-    fn flatten_fill_sign_for_save(&mut self, id: pdfcraft_engine::DocId) -> bool {
+    fn flatten_fill_sign_for_save(&mut self, id: evopdf_engine::DocId) -> bool {
         if !self.flatten_fill_sign_on_save {
             return true;
         }
@@ -765,7 +765,7 @@ impl PdfCraftApp {
     /// `pending_overwrite` behind [`Dialog::OverwriteChanged`](crate::Dialog::OverwriteChanged).
     /// Returns `true` if written now.
     #[cfg(not(target_arch = "wasm32"))]
-    fn save_doc_to_then(&mut self, id: pdfcraft_engine::DocId, dest: &str, target: SaveTarget, after: Box<dyn FnOnce(&mut Self) + Send>) -> bool {
+    fn save_doc_to_then(&mut self, id: evopdf_engine::DocId, dest: &str, target: SaveTarget, after: Box<dyn FnOnce(&mut Self) + Send>) -> bool {
         let own = self.session.get(id).and_then(|d| d.path.as_deref()).is_some_and(|p| crate::same_file(p, dest));
         if own && self.watch.disk_differs(id, dest, self.session.get(id).map(|d| d.saved_bytes())) {
             self.pending_overwrite = Some(PendingOverwrite { id, dest: dest.to_string(), target, after });
@@ -831,7 +831,7 @@ impl PdfCraftApp {
 
     /// Write document `id` to `dest` and make it the document's file. Returns `true` if written.
     #[cfg(not(target_arch = "wasm32"))]
-    fn save_doc_to(&mut self, id: pdfcraft_engine::DocId, dest: &str, target: SaveTarget) -> bool {
+    fn save_doc_to(&mut self, id: evopdf_engine::DocId, dest: &str, target: SaveTarget) -> bool {
         // Save As answers on a later frame: commit what was typed meanwhile, too (#166), even
         // if another tab is active by then.
         if !self.commit_typing_in(id) || !self.flatten_fill_sign_for_save(id) {
@@ -1056,13 +1056,13 @@ impl PdfCraftApp {
         }
     }
 
-    /// Ask for the user's attention when the "save changes?" question opens while PdfCraft is in
+    /// Ask for the user's attention when the "save changes?" question opens while EvoPdf is in
     /// the background (Quit in the Dock menu, logging out, or an agent quitting), and withdraw the
     /// request once the user comes back or the question is answered.
     ///
     /// The question holds up the quit the user asked for, so the request is critical, as AppKit
     /// makes it for a modal panel that an inactive app presents: the Dock icon bounces until
-    /// PdfCraft is active, Windows flashes the taskbar button until the window is in front, and
+    /// EvoPdf is active, Windows flashes the taskbar button until the window is in front, and
     /// X11 sets the urgency hint, which stays until it is reset. A question that opens in front
     /// asks nothing, and neither does leaving it open: the user has seen it. Each document asked
     /// about when quitting is a new question, so one that opens in the background asks even after
@@ -1198,7 +1198,7 @@ fn write_atomically_syncing(
     suffixes: impl IntoIterator<Item = u64>,
     sync_all: impl FnOnce(&std::fs::File) -> std::io::Result<()>,
 ) -> std::io::Result<()> {
-    pdfcraft_platform::staging::write_atomically_with(std::path::Path::new(path), bytes, StagingName::TagThenSuffix, suffixes, sync_all)
+    evopdf_platform::staging::write_atomically_with(std::path::Path::new(path), bytes, StagingName::TagThenSuffix, suffixes, sync_all)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1209,12 +1209,12 @@ fn short_name(path: &str) -> String {
 #[cfg(target_arch = "wasm32")]
 thread_local! {
     /// Evora (COL-42): where [`download`] hands the files instead of the browser, once a host page
-    /// asked for them (`PdfCraftApp::set_host_export`).
+    /// asked for them (`EvoPdfApp::set_host_export`).
     static HOST_EXPORT: std::cell::RefCell<Option<crate::HostExportFn>> = const { std::cell::RefCell::new(None) };
 }
 
 #[cfg(target_arch = "wasm32")]
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Evora (COL-42): from now on, every file the app would download goes to `export` instead, and
     /// the browser downloads nothing; `None` gives the downloads back to the browser.
     pub fn set_host_export(export: Option<crate::HostExportFn>) {
@@ -1223,7 +1223,7 @@ impl PdfCraftApp {
 }
 
 /// Offer bytes as a browser download. Evora (COL-42): or hand them to the host page that asked for
-/// them (`PdfCraftApp::set_host_export`), which then gets every such file.
+/// them (`EvoPdfApp::set_host_export`), which then gets every such file.
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn download(name: &str, bytes: &[u8]) -> Result<(), String> {
     use wasm_bindgen::JsCast;
@@ -1246,7 +1246,7 @@ pub(crate) fn download(name: &str, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Carry out a Bookmarks-panel action as an undoable edit.
     pub fn bookmark_action(&mut self, action: crate::panels::BmAction) {
         use crate::panels::BmAction as A;
@@ -1304,7 +1304,7 @@ impl PdfCraftApp {
     }
 }
 
-fn bookmark_at<'a>(items: &'a [pdfcraft_render::OutlineItem], path: &[usize]) -> Option<&'a pdfcraft_render::OutlineItem> {
+fn bookmark_at<'a>(items: &'a [evopdf_render::OutlineItem], path: &[usize]) -> Option<&'a evopdf_render::OutlineItem> {
     let (first, rest) = path.split_first()?;
     let item = items.get(*first)?;
     if rest.is_empty() { Some(item) } else { bookmark_at(&item.children, rest) }
@@ -1337,19 +1337,19 @@ mod tests {
         assert_eq!(save_dialog_folder(Some(r"\\nas\projets")), None);
         assert_eq!(save_dialog_folder(Some(r"C:\Users\a\f.pdf")), Some(PathBuf::from(r"C:\Users\a")));
     }
-    use pdfcraft_platform::staging::{STAGING_ATTEMPTS, staging_suffixes};
+    use evopdf_platform::staging::{STAGING_ATTEMPTS, staging_suffixes};
     use std::path::{Path, PathBuf};
 
     /// A fresh, empty folder for one staging test.
     fn staging_dir(test: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("pdfcraft-ui-staging-{}-{test}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("evopdf-ui-staging-{}-{test}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
 
     fn staged(dir: &Path, suffix: u64) -> PathBuf {
-        dir.join(format!(".out.pdf.pdfcraft-{suffix:016x}.tmp"))
+        dir.join(format!(".out.pdf.evopdf-{suffix:016x}.tmp"))
     }
 
     fn read(p: &Path) -> String {
@@ -1617,7 +1617,7 @@ mod tests {
     fn save_commits_the_open_text_box() {
         let dir = staging_dir("open-text-box");
         let dest = dir.join("out.pdf");
-        let mut app = crate::PdfCraftApp::new();
+        let mut app = crate::EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("a.pdf", None, one_page_pdf()).unwrap();
         app.save_override = Some(dest.to_string_lossy().into_owned());
@@ -1649,10 +1649,10 @@ mod tests {
         std::fs::write(&attachment, &original).unwrap();
         let kept = dir.join("Quote.pdf");
 
-        let mut app = crate::PdfCraftApp::new();
+        let mut app = crate::EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("Quote.pdf", Some(attachment.to_string_lossy().into_owned()), original.clone()).unwrap();
-        assert!(app.apply_edit(pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
+        assert!(app.apply_edit(evopdf_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
         app.pick_override = Some(vec![kept.to_string_lossy().into_owned()]);
 
         assert!(!app.save_active(SaveTarget::InPlace), "Save asks instead of writing the temporary copy");
@@ -1662,7 +1662,7 @@ mod tests {
 
         // The chosen file is the document's file now: the next Save writes it without asking.
         app.pick_override = None;
-        assert!(app.apply_edit(pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
+        assert!(app.apply_edit(evopdf_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
         assert!(app.save_active(SaveTarget::InPlace));
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -1672,7 +1672,7 @@ mod tests {
 mod revert_draft_tests {
     use super::*;
     use crate::forms_ui::Focus;
-    use pdfcraft_engine::FieldValue;
+    use evopdf_engine::FieldValue;
 
     fn focus(text: &str) -> Focus {
         Focus {
@@ -1690,13 +1690,13 @@ mod revert_draft_tests {
         }
     }
 
-    fn app() -> PdfCraftApp {
-        let mut app = PdfCraftApp::new();
+    fn app() -> EvoPdfApp {
+        let mut app = EvoPdfApp::new();
         app.open_bytes("source.pdf", None, include_bytes!("../tests/data/form.pdf").to_vec()).unwrap();
         app
     }
 
-    fn queue_draft(app: &mut PdfCraftApp, index: usize, text: &str) {
+    fn queue_draft(app: &mut EvoPdfApp, index: usize, text: &str) {
         app.views[index].forms.focus = Some(focus(text));
         let form = app.session.get(app.views[index].id).unwrap().form.clone();
         crate::forms_ui::commit(&mut app.views[index], &form);
@@ -1742,7 +1742,7 @@ mod revert_draft_tests {
     fn a_value_its_font_cannot_draw_is_kept_and_explained() {
         let mut app = app();
         let fill =
-            |app: &mut PdfCraftApp, text: &str| app.apply_edit(Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text(text.into()) });
+            |app: &mut EvoPdfApp, text: &str| app.apply_edit(Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text(text.into()) });
         assert!(fill(&mut app, "张三"));
         let toast = app.toast.as_ref().map(|t| t.0.clone()).expect("a notice");
         assert!(toast.contains("“张” (U+5F20)") && toast.contains("other PDF viewers redraw the field"), "{toast}");
@@ -1792,15 +1792,15 @@ mod revert_draft_tests {
     #[test]
     fn saving_on_close_keeps_text_typed_into_a_new_text_box() {
         use crate::content_ui::{TextDraft, default_style};
-        use pdfcraft_engine::AddedContent;
+        use evopdf_engine::AddedContent;
         for quit in [false, true] {
-            let dir = std::env::temp_dir().join(format!("pdfcraft-ui-new-text-{}-{quit}", std::process::id()));
+            let dir = std::env::temp_dir().join(format!("evopdf-ui-new-text-{}-{quit}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("source.pdf").to_string_lossy().into_owned();
             let bytes = include_bytes!("../tests/data/form.pdf").to_vec();
             std::fs::write(&path, &bytes).unwrap();
-            let mut app = PdfCraftApp::new();
+            let mut app = EvoPdfApp::new();
             app.open_bytes("source.pdf", Some(path.clone()), bytes).unwrap();
             let rect = [72.0, 72.0, 272.0, 92.0];
             app.views[0].content.draft = Some(TextDraft { page: 0, index: None, rect, text: "Typed".into(), style: default_style(), focus: true });
@@ -1814,7 +1814,7 @@ mod revert_draft_tests {
             app.resolve_close(&ctx, Some(true));
             assert!(app.views.is_empty(), "the tab closes once saved");
 
-            let mut reopened = PdfCraftApp::new();
+            let mut reopened = EvoPdfApp::new();
             reopened.open_bytes("source.pdf", Some(path.clone()), std::fs::read(&path).unwrap()).unwrap();
             let doc = reopened.session.get(reopened.views[0].id).unwrap();
             assert!(doc.added().iter().any(|a| matches!(&a.content, AddedContent::Text(t) if t.text == "Typed")), "quit: {quit}");
@@ -1878,14 +1878,14 @@ mod revert_draft_tests {
             matches!(&app.views[0].pending_edit, Some(Edit::SetFieldValue { name, value: FieldValue::Text(text) }) if name == "name" && text == "Queued draft")
         );
         assert_eq!(app.active_ids(), Some((0, source)));
-        assert_eq!(app.toast.as_ref().unwrap().0, pdfcraft_engine::EditError::NoDocument.to_string());
+        assert_eq!(app.toast.as_ref().unwrap().0, evopdf_engine::EditError::NoDocument.to_string());
     }
 }
 
 #[cfg(test)]
 mod content_page_tests {
     use super::content_page;
-    use pdfcraft_engine::{Edit, ObjectKind, ObjectTarget};
+    use evopdf_engine::{Edit, ObjectKind, ObjectTarget};
 
     /// Single-page content edits keep every other page's rasters; anything else still
     /// invalidates the whole document.
@@ -1901,11 +1901,11 @@ mod content_page_tests {
 #[cfg(test)]
 mod attention_tests {
     use super::CloseRequest;
-    use crate::PdfCraftApp;
+    use crate::EvoPdfApp;
 
     /// The attention requests one frame of `attend_save_prompt` sends, with the window `focused`
     /// or not.
-    fn attend(app: &mut PdfCraftApp, ctx: &egui::Context, focused: bool) -> Vec<egui::UserAttentionType> {
+    fn attend(app: &mut EvoPdfApp, ctx: &egui::Context, focused: bool) -> Vec<egui::UserAttentionType> {
         let mut out = ctx.run_ui(egui::RawInput { focused, ..Default::default() }, |ui| app.attend_save_prompt(ui.ctx()));
         // The frame's font texture isn't uploaded anywhere in a unit test.
         out.textures_delta.clear();
@@ -1921,12 +1921,12 @@ mod attention_tests {
     #[test]
     fn a_save_finishing_behind_a_newer_question_the_user_saw_asks_for_nothing() {
         let ctx = egui::Context::default();
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         for name in ["a.pdf", "b.pdf", "c.pdf"] {
             let bytes = app.session.create_blank(200.0, 300.0, 1).unwrap();
             app.open_bytes(name, None, bytes.as_ref().clone()).unwrap();
             app.active = Some(app.views.len() - 1);
-            assert!(app.apply_edit(pdfcraft_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
+            assert!(app.apply_edit(evopdf_engine::Edit::RotatePages { pages: vec![0], degrees: 90 }));
         }
         // a.pdf was answered with Save while quitting. While that save is pending, the user closes
         // c.pdf's tab, and its question opens in front.

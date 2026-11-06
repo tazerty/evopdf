@@ -1,9 +1,9 @@
-//! pdfcraft-engine — the façade every frontend talks to (architecture §4).
+//! evopdf-engine — the façade every frontend talks to (architecture §4).
 //!
 //! Holds open documents, their edit history and the tool catalogue. Frontends never touch the
 //! parsing, rendering or editing crates directly.
 //!
-//! **Editing model.** Each document keeps a `pdfcraft_cos::Document` (the object graph with a
+//! **Editing model.** Each document keeps a `evopdf_cos::Document` (the object graph with a
 //! copy-on-write overlay of edits). An edit runs on a clone, and on success the previous state is
 //! pushed onto the undo stack (clones share all unchanged data, so this is cheap). After every
 //! edit the *working file* is produced by an incremental write — original bytes plus one
@@ -49,36 +49,36 @@ pub use signature_scan::{PhotoRect, ScanError, SignaturePhoto, Turn};
 pub use stamp_preview::StampPreview;
 pub use text_preview::TextEditPreview;
 
-pub use pdfcraft_organize::{BoxSpec, FieldConflicts, PageBox, SplitBy, Transition, TransitionSpec, mime_for_name, split_ranges};
+pub use evopdf_organize::{BoxSpec, FieldConflicts, PageBox, SplitBy, Transition, TransitionSpec, mime_for_name, split_ranges};
 
 /// One file produced by a split: (1-based first page, last page, PDF bytes).
-pub use pdfcraft_organize::LabelStyle;
-pub use pdfcraft_organize::Standard;
-pub use pdfcraft_organize::check_custom_key;
-pub use pdfcraft_organize::view::{InitialView, Layout as InitialLayout, Magnification, Navigation};
+pub use evopdf_organize::LabelStyle;
+pub use evopdf_organize::Standard;
+pub use evopdf_organize::check_custom_key;
+pub use evopdf_organize::view::{InitialView, Layout as InitialLayout, Magnification, Navigation};
 
-pub use pdfcraft_cos::Algorithm;
-pub use pdfcraft_create::{CONVERTIBLE, CreateError, ImageResolution, SourceKind, decode_text, source_kind};
-pub use pdfcraft_edit::added::{
+pub use evopdf_cos::Algorithm;
+pub use evopdf_create::{CONVERTIBLE, CreateError, ImageResolution, SourceKind, decode_text, source_kind};
+pub use evopdf_edit::added::{
     CHAR_SPACING_LIMIT as ADDED_CHAR_SPACING_LIMIT, paste_place as added_paste_place, paste_rect as added_paste_rect, text_rect as added_text_rect,
     text_width as added_text_width,
 };
-pub use pdfcraft_edit::{
+pub use evopdf_edit::{
     Added, AddedImage, AddedText, Align as TextAlign, Background, Content as AddedContent, Family as FontFamily, HeaderFooter, MarkKind, Watermark,
 };
-pub use pdfcraft_forms::{
+pub use evopdf_forms::{
     BorderStyle, CalculatedField, CalculationIssue, CalculationOrder, CheckStyle, Field as FormField, FieldAction, FieldChange, FieldFont,
     FieldKind as FormFieldKind, FieldProps, FieldValue, Look as FieldLook, LookPatch as FieldLookPatch, NewField, TabOrder, Trigger as FieldTrigger,
     Widget as FormWidget, af as form_scripts, appearance as form_appearance, appearance::auto_text_size_by as field_auto_text_size_by,
     calculations_changed as form_calculations_changed, flags as field_flags,
 };
 
-pub use pdfcraft_a11y as a11y;
-pub use pdfcraft_edit::{BlockKey, BlockStyle, PageImage, RangeStyle, TextBlock, TextLine, block_overlapping, first_undrawable};
-pub use pdfcraft_measure as measure;
-pub use pdfcraft_xfa::Report as XfaLayout;
+pub use evopdf_a11y as a11y;
+pub use evopdf_edit::{BlockKey, BlockStyle, PageImage, RangeStyle, TextBlock, TextLine, block_overlapping, first_undrawable};
+pub use evopdf_measure as measure;
+pub use evopdf_xfa::Report as XfaLayout;
 
-pub use pdfcraft_edit::{EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
+pub use evopdf_edit::{EditableObject, MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
 
 /// A change to an existing page image.
 #[derive(Clone, Debug, PartialEq)]
@@ -101,7 +101,7 @@ pub enum ImageEdit {
     },
     Delete,
 }
-pub use pdfcraft_fonts::{MAX_SIGNATURE_CHARS, ScriptOutline, script_missing, script_outline, undrawable_message};
+pub use evopdf_fonts::{MAX_SIGNATURE_CHARS, ScriptOutline, script_missing, script_outline, undrawable_message};
 
 /// Fill & Sign: `text` in the script font as a typed signature, its left edge at `at` (user
 /// space, vertically centred) and `height` points tall. `None` for text with no outlines.
@@ -121,14 +121,14 @@ pub fn typed_signature_shape(at: [f64; 2], text: &str, height: f64, rotation: i6
     let rect = signature_image::upright_box(rotation, at, width * k, height)?;
     // Displayed right and up as user-space unit vectors: a point at (nx, ny) of the displayed box
     // is at this fraction of the user-space box. Exact for an unturned page.
-    let [a, b, c, d, ..] = pdfcraft_model::view_matrix_for(rotation, [0.0; 4]);
+    let [a, b, c, d, ..] = evopdf_model::view_matrix_for(rotation, [0.0; 4]);
     let to_user = |nx: f64, ny: f64| [a * nx + c * ny + (-a).max(0.0) + (-c).max(0.0), b * nx + d * ny + (-b).max(0.0) + (-d).max(0.0)];
     let contours = o.contours.iter().map(|c| c.iter().map(|p| to_user((p[0] - left) / width, (p[1] - bottom) / span)).collect()).collect();
     Some(Shape::TypedSignature { rect, contours })
 }
 /// `at` moved `right` and `up` points as displayed on a page turned by `rotation` (its `/Rotate`).
 pub fn displayed_offset(rotation: i64, at: [f64; 2], right: f64, up: f64) -> [f64; 2] {
-    let [a, b, c, d, ..] = pdfcraft_model::view_matrix_for(rotation, [0.0; 4]);
+    let [a, b, c, d, ..] = evopdf_model::view_matrix_for(rotation, [0.0; 4]);
     [at[0] + a * right + c * up, at[1] + b * right + d * up]
 }
 
@@ -141,40 +141,40 @@ pub fn text_box_at(rotation: i64, at: [f64; 2], width: f64, height: f64) -> Opti
 
 /// `text` in the script font as the graphic of a visible digital signature, as Fill & Sign types
 /// it. `None` for text with no outlines.
-pub fn typed_signature_graphic(text: &str) -> Option<pdfcraft_sign::Graphic> {
+pub fn typed_signature_graphic(text: &str) -> Option<evopdf_sign::Graphic> {
     let o = script_outline(text);
-    o.contours.iter().any(|c| c.len() > 2).then_some(pdfcraft_sign::Graphic::Outlines(o.contours))
+    o.contours.iter().any(|c| c.len() > 2).then_some(evopdf_sign::Graphic::Outlines(o.contours))
 }
 
 pub use links::{
     MAX_REMOTE_DOCUMENT_BYTES, RemoteDocumentPathError, read_remote_document, remote_document_path_is_absolute, resolve_remote_document_path,
 };
 /// Comment geometry helpers (text-box line breaking) for frontends.
-pub use pdfcraft_annot::appearance as annot_text;
-pub use pdfcraft_annot::links::{Highlight as LinkHighlight, LinkAction, LinkItem, LinkStyle};
-pub use pdfcraft_annot::{
+pub use evopdf_annot::appearance as annot_text;
+pub use evopdf_annot::links::{Highlight as LinkHighlight, LinkAction, LinkItem, LinkStyle};
+pub use evopdf_annot::{
     AppearanceCache, AttachIcon, FillMark, LineEnding, Markup, NOTE_SIZE, NewAnnotation, NoteIcon, OverlayFont, OverlayLook, Props as CommentProps,
     ReviewState, Rgb, Shape, StampGroup, StampKind, Style, rect_quad,
 };
-pub use pdfcraft_forms::detect;
-pub use pdfcraft_optimize as optimize;
-pub use pdfcraft_preflight as pdfa;
-pub use pdfcraft_print as print;
-pub use pdfcraft_redact::codes::{CODE_SETS as REDACTION_CODE_SETS, CodeSet as RedactionCodeSet};
-pub use pdfcraft_redact::patterns::{
+pub use evopdf_forms::detect;
+pub use evopdf_optimize as optimize;
+pub use evopdf_preflight as pdfa;
+pub use evopdf_print as print;
+pub use evopdf_redact::codes::{CODE_SETS as REDACTION_CODE_SETS, CodeSet as RedactionCodeSet};
+pub use evopdf_redact::patterns::{
     MAX_WORDS as REDACT_MAX_WORDS, PATTERNS as REDACT_PATTERNS, Pattern as RedactPattern, find as find_pattern, word_list as redact_word_list,
 };
-pub use pdfcraft_redact::sanitize::{HIDDEN, Hidden};
-pub use pdfcraft_sign as sign;
-pub use pdfcraft_sign::{SignOptions, SignatureInfo, Status as SignatureStatus, TrustStore};
-pub use pdfcraft_xfdf::Format as DataFormat;
+pub use evopdf_redact::sanitize::{HIDDEN, Hidden};
+pub use evopdf_sign as sign;
+pub use evopdf_sign::{SignOptions, SignatureInfo, Status as SignatureStatus, TrustStore};
+pub use evopdf_xfdf::Format as DataFormat;
 
 /// Forms ▸ Merge data files into spreadsheet: the field values of each file (FDF, XFDF or a
 /// filled-in PDF form), as CSV with one row per file.
 pub fn merge_data_files(files: &[(String, Vec<u8>)]) -> Result<String, String> {
     let rows =
-        files.iter().map(|(name, bytes)| pdfcraft_xfdf::data_values(bytes).map_err(|e| format!("{name}: {e}"))).collect::<Result<Vec<_>, _>>()?;
-    Ok(pdfcraft_xfdf::merge_csv(&rows))
+        files.iter().map(|(name, bytes)| evopdf_xfdf::data_values(bytes).map_err(|e| format!("{name}: {e}"))).collect::<Result<Vec<_>, _>>()?;
+    Ok(evopdf_xfdf::merge_csv(&rows))
 }
 
 pub type SplitPart = (usize, usize, Arc<Vec<u8>>);
@@ -229,8 +229,8 @@ fn record_link_scan() {
     });
 }
 
-use pdfcraft_cos::{SaveOptions, write_full, write_incremental};
-use pdfcraft_render::{DocInfo, Layer, LayerOp, OpenError, ReadingColors, RenderConfig, RenderPool, inspect};
+use evopdf_cos::{SaveOptions, write_full, write_incremental};
+use evopdf_render::{DocInfo, Layer, LayerOp, OpenError, ReadingColors, RenderConfig, RenderPool, inspect};
 
 /// Stable identifier of an open document within a session.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -333,12 +333,12 @@ fn scope_of(edit: &Edit) -> Scope {
 }
 
 /// One undo/redo step: its label, the document state, its passwords, and what it changed.
-type Snapshot = (Label, pdfcraft_cos::Document, Keys, Scope);
+type Snapshot = (Label, evopdf_cos::Document, Keys, Scope);
 
 /// Editing state of a document (absent when the document cannot be edited yet, e.g. encrypted).
 #[derive(Clone)]
 struct Editor {
-    cos: pdfcraft_cos::Document,
+    cos: evopdf_cos::Document,
     /// The file as last opened or saved. Incremental saves append to it, and Revert opens it.
     /// Undo may restore a snapshot whose own base is an earlier revision; this does not follow it.
     saved: Arc<Vec<u8>>,
@@ -357,21 +357,21 @@ struct Editor {
     appearances: AppearanceCache,
     /// Display appearances drawn for form fields the file leaves to the viewer (#3470), reused
     /// for each widget while the objects it was drawn from are unchanged; see
-    /// [`pdfcraft_forms::FieldAppearanceCache`].
-    field_appearances: pdfcraft_forms::FieldAppearanceCache,
+    /// [`evopdf_forms::FieldAppearanceCache`].
+    field_appearances: evopdf_forms::FieldAppearanceCache,
     /// The text blocks last computed for one page, reused while the document is unchanged.
     text_blocks: TextBlocksCache,
 }
 
-/// One page's text blocks ([`pdfcraft_edit::text_blocks`]) and the document state they were read
+/// One page's text blocks ([`evopdf_edit::text_blocks`]) and the document state they were read
 /// from. Opening a paragraph and applying its edit both need them, and grouping a long page is not
-/// cheap. The state ([`pdfcraft_cos::ReadState`]) changes with every edit and save and returns
+/// cheap. The state ([`evopdf_cos::ReadState`]) changes with every edit and save and returns
 /// with undo, so a stale entry never matches, also after the document has been edited.
 #[derive(Default)]
 struct TextBlocksCache(std::sync::Mutex<Option<CachedTextBlocks>>);
 
 /// The document state, the page (0-based) and its text blocks.
-type CachedTextBlocks = (pdfcraft_cos::ReadState, usize, Arc<Vec<pdfcraft_edit::TextBlock>>);
+type CachedTextBlocks = (evopdf_cos::ReadState, usize, Arc<Vec<evopdf_edit::TextBlock>>);
 
 impl Clone for TextBlocksCache {
     fn clone(&self) -> Self {
@@ -382,7 +382,7 @@ impl Clone for TextBlocksCache {
 
 impl Editor {
     /// The text blocks on `page` (0-based), from the cache when the document hasn't changed.
-    fn text_blocks(&self, page: usize) -> Result<Arc<Vec<pdfcraft_edit::TextBlock>>, EditError> {
+    fn text_blocks(&self, page: usize) -> Result<Arc<Vec<evopdf_edit::TextBlock>>, EditError> {
         if let Ok(cache) = self.text_blocks.0.lock()
             && let Some((state, p, blocks)) = cache.as_ref()
             && *p == page
@@ -390,7 +390,7 @@ impl Editor {
         {
             return Ok(blocks.clone());
         }
-        let blocks = Arc::new(pdfcraft_edit::text_blocks(&self.cos, page)?);
+        let blocks = Arc::new(evopdf_edit::text_blocks(&self.cos, page)?);
         if let Ok(mut cache) = self.text_blocks.0.lock() {
             *cache = Some((self.cos.read_state(), page, blocks.clone()));
         }
@@ -420,22 +420,22 @@ pub struct Document {
     /// Why the document cannot be edited (e.g. encryption), if so.
     pub read_only_reason: Option<String>,
     /// Interactive form fields of the current state (empty without a form).
-    pub form: Arc<Vec<pdfcraft_forms::Field>>,
-    marker_scan: OnceLock<pdfcraft_edit::MarkerScan>,
-    links: OnceLock<Vec<pdfcraft_annot::links::LinkItem>>,
+    pub form: Arc<Vec<evopdf_forms::Field>>,
+    marker_scan: OnceLock<evopdf_edit::MarkerScan>,
+    links: OnceLock<Vec<evopdf_annot::links::LinkItem>>,
     /// Signature fields, validated against the session's trust store (Signatures panel).
     pub signatures: Arc<Vec<SignatureInfo>>,
     trust: Arc<TrustStore>,
-    sig_cache: Arc<pdfcraft_sign::DigestCache>,
+    sig_cache: Arc<evopdf_sign::DigestCache>,
     editor: Option<Editor>,
     config: RenderConfig,
     /// What field scripts printed or asked for (see [`Session::take_js_output`]).
     js_output: js::JsOutput,
     /// Dynamic XFA forms: what laying the template out produced (pages and fields are
-    /// PdfCraft's; Adobe's viewers draw the form from the XFA packets themselves).
+    /// EvoPdf's; Adobe's viewers draw the form from the XFA packets themselves).
     pub xfa: Option<XfaLayout>,
     /// The parsed template of a laid-out XFA form, for its scripts.
-    xfa_template: Option<Arc<pdfcraft_xfa::model::Template>>,
+    xfa_template: Option<Arc<evopdf_xfa::model::Template>>,
     /// A script of the XFA form ran away, so its scripts are off (see [`Document::xfa_scripts_off`]).
     xfa_scripts_off: bool,
     /// A content-only refresh keeps `info` from before the edit; an edit may have added or
@@ -451,7 +451,7 @@ pub struct Document {
 
 /// Text an edit stored as typed but drew with `?` in place of `ch`, because the font it is drawn
 /// with (a form field's, or the standard fonts for comments) can't draw that character. Acrobat
-/// keeps such text too, drawing it with fonts PdfCraft can't embed yet.
+/// keeps such text too, drawing it with fonts EvoPdf can't embed yet.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextNotice {
     /// The form field's full name, or `None` for a comment.
@@ -471,7 +471,7 @@ impl std::fmt::Display for TextNotice {
         match (&self.field, self.redrawn_elsewhere) {
             (Some(name), true) => write!(
                 f,
-                "form field {name:?} (page {page}) holds {ch}, which its font can't draw: the value is saved, PdfCraft shows ? in its place, and other PDF viewers redraw the field from the value"
+                "form field {name:?} (page {page}) holds {ch}, which its font can't draw: the value is saved, EvoPdf shows ? in its place, and other PDF viewers redraw the field from the value"
             ),
             (Some(name), false) => write!(
                 f,
@@ -486,26 +486,26 @@ impl std::fmt::Display for TextNotice {
 }
 
 /// What `next` drew with `?` that `prev` didn't (a new or redrawn appearance carrying
-/// `pdfcraft_fonts::UNDRAWN_MARK`), one notice per field or comment, in page order.
-fn undrawn_notices(prev: &pdfcraft_cos::Document, next: &pdfcraft_cos::Document) -> Vec<TextNotice> {
-    let Ok(pages) = pdfcraft_annot::page_refs(next) else { return Vec::new() };
-    let redrawn_elsewhere = pdfcraft_forms::need_appearances(next);
-    let mut names: Option<std::collections::HashMap<pdfcraft_cos::ObjRef, String>> = None;
+/// `evopdf_fonts::UNDRAWN_MARK`), one notice per field or comment, in page order.
+fn undrawn_notices(prev: &evopdf_cos::Document, next: &evopdf_cos::Document) -> Vec<TextNotice> {
+    let Ok(pages) = evopdf_annot::page_refs(next) else { return Vec::new() };
+    let redrawn_elsewhere = evopdf_forms::need_appearances(next);
+    let mut names: Option<std::collections::HashMap<evopdf_cos::ObjRef, String>> = None;
     let mut out: Vec<TextNotice> = Vec::new();
     for (page, p) in pages.iter().enumerate() {
         let annots = next.get(*p).as_dict().and_then(|d| d.get(b"Annots").cloned()).map(|a| next.resolve(&a));
-        for r in annots.as_deref().and_then(pdfcraft_cos::Object::as_array).into_iter().flatten().filter_map(pdfcraft_cos::Object::as_ref) {
+        for r in annots.as_deref().and_then(evopdf_cos::Object::as_array).into_iter().flatten().filter_map(evopdf_cos::Object::as_ref) {
             let now = next.get(r);
             let Some(d) = now.as_dict() else { continue };
-            let Some(ch) = pdfcraft_fonts::undrawn_mark(d) else { continue };
+            let Some(ch) = evopdf_fonts::undrawn_mark(d) else { continue };
             // Only what this edit drew: a new annotation, or a new appearance.
             let was = prev.get(r);
-            if was.as_dict().is_some_and(|w| w.get(b"AP") == d.get(b"AP") && pdfcraft_fonts::undrawn_mark(w) == Some(ch)) {
+            if was.as_dict().is_some_and(|w| w.get(b"AP") == d.get(b"AP") && evopdf_fonts::undrawn_mark(w) == Some(ch)) {
                 continue;
             }
             let field = (d.name(b"Subtype") == Some(b"Widget")).then(|| {
                 let names = names.get_or_insert_with(|| {
-                    pdfcraft_forms::fields(next)
+                    evopdf_forms::fields(next)
                         .into_iter()
                         .flat_map(|f| f.widgets.iter().map(|w| (w.obj, f.name.clone())).collect::<Vec<_>>())
                         .collect()
@@ -542,15 +542,15 @@ impl Document {
     }
 
     /// Edit a PDF: the images `page` draws (0-based).
-    pub fn page_images(&self, page: usize) -> Vec<pdfcraft_edit::PageImage> {
-        self.editor.as_ref().and_then(|e| pdfcraft_edit::page_images(&e.cos, page).ok()).unwrap_or_default()
+    pub fn page_images(&self, page: usize) -> Vec<evopdf_edit::PageImage> {
+        self.editor.as_ref().and_then(|e| evopdf_edit::page_images(&e.cos, page).ok()).unwrap_or_default()
     }
 
     /// Mixed editable objects on one page. Source inventories are zero-based and added items
     /// appear once. Rectangles are user-space points, independent of the viewer's zoom.
     pub fn editable_objects(&self, page: usize) -> Result<Vec<EditableObject>, String> {
         let editor = self.editor.as_ref().ok_or("the document can't be read")?;
-        pdfcraft_edit::editable_objects(&editor.cos, page).map_err(|e| e.to_string())
+        evopdf_edit::editable_objects(&editor.cos, page).map_err(|e| e.to_string())
     }
 
     /// Displayed top-left-origin motion to a user-space vector. Use the linear map only,
@@ -580,11 +580,11 @@ impl Document {
         if img.is_form {
             return Err("grouped Form artwork is not a bitmap; Save Image As is only available for raster images".into());
         }
-        pdfcraft_create::image_file(&editor.cos, img.object.ok_or("the image has no object")?)
+        evopdf_create::image_file(&editor.cos, img.object.ok_or("the image has no object")?)
     }
 
     /// Edit a PDF ▸ Edit text: the paragraphs on `page` (0-based).
-    pub fn text_blocks(&self, page: usize) -> Vec<pdfcraft_edit::TextBlock> {
+    pub fn text_blocks(&self, page: usize) -> Vec<evopdf_edit::TextBlock> {
         self.editor.as_ref().and_then(|e| e.text_blocks(page).ok()).map(|b| b.as_ref().clone()).unwrap_or_default()
     }
 
@@ -623,14 +623,14 @@ impl Document {
     }
 
     /// Edit a PDF ▸ Edit text: the lines of existing text on `page` (0-based).
-    pub fn text_lines(&self, page: usize) -> Vec<pdfcraft_edit::TextLine> {
-        self.editor.as_ref().and_then(|e| pdfcraft_edit::text_lines(&e.cos, page).ok()).unwrap_or_default()
+    pub fn text_lines(&self, page: usize) -> Vec<evopdf_edit::TextLine> {
+        self.editor.as_ref().and_then(|e| evopdf_edit::text_lines(&e.cos, page).ok()).unwrap_or_default()
     }
 
     /// The form's calculation order: its calculated fields in the order they calculate, what each
     /// formula reads, what is wrong with the order, and the order Fix order writes.
     pub fn calculation_order(&self) -> CalculationOrder {
-        self.editor.as_ref().map(|e| pdfcraft_forms::calculation_order(&e.cos, &self.form)).unwrap_or_default()
+        self.editor.as_ref().map(|e| evopdf_forms::calculation_order(&e.cos, &self.form)).unwrap_or_default()
     }
 
     /// Add alternate text: the figures, in document order.
@@ -644,7 +644,7 @@ impl Document {
     }
 
     /// Marked-content items directly owned by one reachable indirect structure tag.
-    pub fn tag_content(&self, object: pdfcraft_cos::ObjRef) -> Result<Vec<a11y::TagContentItem>, a11y::TagError> {
+    pub fn tag_content(&self, object: evopdf_cos::ObjRef) -> Result<Vec<a11y::TagContentItem>, a11y::TagError> {
         self.editor.as_ref().map(|e| a11y::tag_content(&e.cos, object)).unwrap_or_else(|| Ok(Vec::new()))
     }
 
@@ -677,7 +677,7 @@ impl Document {
     }
 
     pub fn initial_view(&self) -> InitialView {
-        self.editor.as_ref().map(|e| pdfcraft_organize::initial_view(&e.cos)).unwrap_or_default()
+        self.editor.as_ref().map(|e| evopdf_organize::initial_view(&e.cos)).unwrap_or_default()
     }
 
     /// Signed: at least one signature field holds a signature.
@@ -713,7 +713,7 @@ impl Document {
     }
 
     /// What the opening password allows; `None` when the document is not encrypted.
-    pub fn permissions(&self) -> Option<pdfcraft_cos::Permissions> {
+    pub fn permissions(&self) -> Option<evopdf_cos::Permissions> {
         self.editor.as_ref().and_then(|e| e.cos.permissions())
     }
 
@@ -754,7 +754,7 @@ impl Document {
                     .map(|e| {
                         #[cfg(test)]
                         record_marker_scan();
-                        pdfcraft_edit::scan_markers(&e.cos)
+                        evopdf_edit::scan_markers(&e.cos)
                     })
                     .unwrap_or_default()
             })
@@ -762,7 +762,7 @@ impl Document {
     }
 
     /// Text and images added with Edit a PDF ▸ Add content (still editable).
-    pub fn added(&self) -> &[pdfcraft_edit::Added] {
+    pub fn added(&self) -> &[evopdf_edit::Added] {
         &self
             .marker_scan
             .get_or_init(|| {
@@ -771,7 +771,7 @@ impl Document {
                     .map(|e| {
                         #[cfg(test)]
                         record_marker_scan();
-                        pdfcraft_edit::scan_markers(&e.cos)
+                        evopdf_edit::scan_markers(&e.cos)
                     })
                     .unwrap_or_default()
             })
@@ -779,14 +779,14 @@ impl Document {
     }
 
     /// Link annotations, for Edit a PDF ▸ Link.
-    pub fn links(&self) -> &[pdfcraft_annot::links::LinkItem] {
+    pub fn links(&self) -> &[evopdf_annot::links::LinkItem] {
         self.links.get_or_init(|| {
             self.editor
                 .as_ref()
                 .map(|e| {
                     #[cfg(test)]
                     record_link_scan();
-                    pdfcraft_annot::links::list(&e.cos)
+                    evopdf_annot::links::list(&e.cos)
                 })
                 .unwrap_or_default()
         })
@@ -839,74 +839,74 @@ impl Document {
         let stream = d.crypt_filters.iter().find(|(name, _)| *name == d.stm_f).map(|(_, m)| *m);
         let method = match (d.v, stream) {
             (1..=3, _) if d.length_bits <= 40 => "RC4, 40-bit",
-            (1..=3, _) | (_, Some(pdfcraft_cos::CryptMethod::Rc4)) => "RC4, 128-bit",
-            (_, Some(pdfcraft_cos::CryptMethod::Aes128)) => "AES, 128-bit",
-            (_, Some(pdfcraft_cos::CryptMethod::Aes256)) => "AES, 256-bit",
+            (1..=3, _) | (_, Some(evopdf_cos::CryptMethod::Rc4)) => "RC4, 128-bit",
+            (_, Some(evopdf_cos::CryptMethod::Aes128)) => "AES, 128-bit",
+            (_, Some(evopdf_cos::CryptMethod::Aes256)) => "AES, 256-bit",
             _ => "Attachments only",
         };
         let pending = editor.cos.encryption_changed();
-        let permissions = if pending { pdfcraft_cos::Permissions { bits: h.permissions().bits, owner: false } } else { h.permissions() };
-        Some(SecuritySummary { method: method.into(), owner: h.auth() == pdfcraft_cos::Auth::Owner && !pending, permissions, pending })
+        let permissions = if pending { evopdf_cos::Permissions { bits: h.permissions().bits, owner: false } } else { h.permissions() };
+        Some(SecuritySummary { method: method.into(), owner: h.auth() == evopdf_cos::Auth::Owner && !pending, permissions, pending })
     }
 
     /// Comment properties of the comment at `(page, index)` (Comment Properties dialog).
-    pub fn comment_props(&self, page: usize, index: usize) -> Option<pdfcraft_annot::Props> {
-        self.editor.as_ref().and_then(|e| pdfcraft_annot::props(&e.cos, page, index))
+    pub fn comment_props(&self, page: usize, index: usize) -> Option<evopdf_annot::Props> {
+        self.editor.as_ref().and_then(|e| evopdf_annot::props(&e.cos, page, index))
     }
 
     /// A form field's Appearance-tab look (borders, colours, font).
-    pub fn field_look(&self, name: &str) -> Option<pdfcraft_forms::Look> {
+    pub fn field_look(&self, name: &str) -> Option<evopdf_forms::Look> {
         let e = self.editor.as_ref()?;
         let f = self.form.iter().find(|f| f.name == name)?;
-        Some(pdfcraft_forms::look(&e.cos, f))
+        Some(evopdf_forms::look(&e.cos, f))
     }
 
     /// A check box's or radio button's mark (Field Properties ▸ Options), `None` for other fields.
     pub fn field_check_style(&self, name: &str) -> Option<CheckStyle> {
         let e = self.editor.as_ref()?;
         let f = self.form.iter().find(|f| f.name == name)?;
-        matches!(f.kind, FormFieldKind::CheckBox | FormFieldKind::Radio).then(|| pdfcraft_forms::check_style(&e.cos, f))
+        matches!(f.kind, FormFieldKind::CheckBox | FormFieldKind::Radio).then(|| evopdf_forms::check_style(&e.cos, f))
     }
 
     /// Whether text field `name`'s value is cut off by its box at the field's font size (#4018):
     /// the page (0-based) of the first widget that cuts it, and how.
-    pub fn field_overflow(&self, name: &str) -> Option<(Option<usize>, pdfcraft_forms::appearance::Overflow)> {
+    pub fn field_overflow(&self, name: &str) -> Option<(Option<usize>, evopdf_forms::appearance::Overflow)> {
         let e = self.editor.as_ref()?;
         let f = self.form.iter().find(|f| f.name == name)?;
-        f.widgets.iter().find_map(|w| pdfcraft_forms::appearance::value_overflow(&e.cos, f, w).map(|o| (w.page, o)))
+        f.widgets.iter().find_map(|w| evopdf_forms::appearance::value_overflow(&e.cos, f, w).map(|o| (w.page, o)))
     }
 
     /// Remove Hidden Information: what each category would remove.
     pub fn hidden_info(&self) -> Vec<(Hidden, usize)> {
-        self.editor.as_ref().map(|e| pdfcraft_redact::sanitize::scan(&e.cos)).unwrap_or_default()
+        self.editor.as_ref().map(|e| evopdf_redact::sanitize::scan(&e.cos)).unwrap_or_default()
     }
 
     /// Verification: faux redactions (opaque covers over extractable text) and redaction
     /// marks that were never applied. Fails closed: any read error is returned, never an
     /// empty list.
-    pub fn audit_redactions(&self) -> Result<Vec<pdfcraft_audit::AuditFinding>, String> {
+    pub fn audit_redactions(&self) -> Result<Vec<evopdf_audit::AuditFinding>, String> {
         let editor = self.editor.as_ref().ok_or("the document can't be read")?;
-        pdfcraft_audit::audit_redactions(&editor.cos).map_err(|e| e.to_string())
+        evopdf_audit::audit_redactions(&editor.cos).map_err(|e| e.to_string())
     }
 
     /// Every page's media, crop, bleed, trim and art boxes (user space), for Set Page Boxes.
     pub fn page_boxes(&self) -> Vec<[[f64; 4]; 5]> {
-        self.editor.as_ref().and_then(|e| pdfcraft_organize::page_boxes(&e.cos).ok()).unwrap_or_default()
+        self.editor.as_ref().and_then(|e| evopdf_organize::page_boxes(&e.cos).ok()).unwrap_or_default()
     }
 
     /// Current value of a document-information entry (Title, Author, …).
     pub fn info_value(&self, key: &str) -> Option<String> {
-        self.editor.as_ref().and_then(|e| pdfcraft_organize::info(&e.cos, key))
+        self.editor.as_ref().and_then(|e| evopdf_organize::info(&e.cos, key))
     }
 
     /// Whether the document information has an entry `key`, of any type, listed or not.
     pub fn has_info(&self, key: &str) -> bool {
-        self.editor.as_ref().is_some_and(|e| pdfcraft_organize::has_info(&e.cos, key))
+        self.editor.as_ref().is_some_and(|e| evopdf_organize::has_info(&e.cos, key))
     }
 
     /// The custom document properties as they are now (name, text), Document Properties ▸ Custom.
     pub fn custom_info(&self) -> Vec<(String, String)> {
-        self.editor.as_ref().map(|e| pdfcraft_organize::custom_info(&e.cos)).unwrap_or_default()
+        self.editor.as_ref().map(|e| evopdf_organize::custom_info(&e.cos)).unwrap_or_default()
     }
 
     /// The name shown on the tab and window: the document title when the document asks for it
@@ -914,8 +914,8 @@ impl Document {
     pub fn display_name(&self) -> String {
         self.editor
             .as_ref()
-            .filter(|e| pdfcraft_organize::displays_doc_title(&e.cos))
-            .and_then(|e| pdfcraft_organize::info(&e.cos, "Title"))
+            .filter(|e| evopdf_organize::displays_doc_title(&e.cos))
+            .and_then(|e| evopdf_organize::info(&e.cos, "Title"))
             .map(|t| t.trim().to_owned())
             .filter(|t| !t.is_empty() && !is_placeholder_title(t))
             .unwrap_or_else(|| self.name.clone())
@@ -954,8 +954,8 @@ fn is_placeholder_title(title: &str) -> bool {
 /// viewer and never enter these bytes, which image/text exports and Print as Image also consume.
 fn display_bytes(editor: Option<&mut Editor>, bytes: &Arc<Vec<u8>>) -> Arc<Vec<u8>> {
     let Some(e) = editor else { return bytes.clone() };
-    let comments = pdfcraft_annot::with_missing_appearances_cached(&e.cos, &mut e.appearances);
-    let fields = pdfcraft_forms::with_field_appearances_cached(comments.as_ref().unwrap_or(&e.cos), &mut e.field_appearances);
+    let comments = evopdf_annot::with_missing_appearances_cached(&e.cos, &mut e.appearances);
+    let fields = evopdf_forms::with_field_appearances_cached(comments.as_ref().unwrap_or(&e.cos), &mut e.field_appearances);
     let Some(display) = fields.or(comments) else {
         return bytes.clone();
     };
@@ -970,20 +970,20 @@ fn display_bytes(editor: Option<&mut Editor>, bytes: &Arc<Vec<u8>>) -> Arc<Vec<u
 
 /// `comments` (the display copy with comment appearances, if it needed any; else the document
 /// itself) with its form fields drawn from their values where the file leaves that to the viewer.
-fn with_field_appearances(comments: Option<pdfcraft_cos::Document>, doc: &pdfcraft_cos::Document) -> Option<pdfcraft_cos::Document> {
-    pdfcraft_forms::with_field_appearances(comments.as_ref().unwrap_or(doc)).or(comments)
+fn with_field_appearances(comments: Option<evopdf_cos::Document>, doc: &evopdf_cos::Document) -> Option<evopdf_cos::Document> {
+    evopdf_forms::with_field_appearances(comments.as_ref().unwrap_or(doc)).or(comments)
 }
 
 /// The reader shows the same pages in `a` and `b`: count, displayed size and rotation.
-fn same_pages(a: &[pdfcraft_render::PageInfo], b: &[pdfcraft_render::PageInfo]) -> bool {
+fn same_pages(a: &[evopdf_render::PageInfo], b: &[evopdf_render::PageInfo]) -> bool {
     a.len() == b.len()
         && a.iter().zip(b).all(|(x, y)| (x.width - y.width).abs() < 0.01 && (x.height - y.height).abs() < 0.01 && x.rotation == y.rotation)
 }
 
 /// Each document-information field of `info` with its value in `cos` (`/Info`, else XMP), read
 /// the way the full inspection reads them: NULs and spaces trimmed, empty is none.
-fn info_fields<'a>(info: &'a mut DocInfo, cos: &pdfcraft_cos::Document) -> [(&'a mut Option<String>, Option<String>); 6] {
-    let read = |key| pdfcraft_organize::info(cos, key).map(|v| v.trim_matches('\0').trim().to_string()).filter(|v| !v.is_empty());
+fn info_fields<'a>(info: &'a mut DocInfo, cos: &evopdf_cos::Document) -> [(&'a mut Option<String>, Option<String>); 6] {
+    let read = |key| evopdf_organize::info(cos, key).map(|v| v.trim_matches('\0').trim().to_string()).filter(|v| !v.is_empty());
     [
         (&mut info.title, read("Title")),
         (&mut info.author, read("Author")),
@@ -994,15 +994,15 @@ fn info_fields<'a>(info: &'a mut DocInfo, cos: &pdfcraft_cos::Document) -> [(&'a
     ]
 }
 
-/// The copy PDFCraft displays when opening `bytes`: with appearances drawn, in memory only, for
+/// The copy EvoPdf displays when opening `bytes`: with appearances drawn, in memory only, for
 /// comments that have none and form fields the file leaves to the viewer. Render paths outside the app, such as the CLI, use this so their page
 /// images agree with the app and independent viewers. It never changes the source document, and an
 /// unparseable file, a write failure or a parser panic falls back to the original bytes.
 pub fn display_bytes_for(bytes: Arc<Vec<u8>>, password: Option<&str>) -> Arc<Vec<u8>> {
     guard(|| {
-        pdfcraft_cos::Document::open_with_password(bytes.clone(), password)
+        evopdf_cos::Document::open_with_password(bytes.clone(), password)
             .ok()
-            .and_then(|cos| with_field_appearances(pdfcraft_annot::with_missing_appearances(&cos), &cos))
+            .and_then(|cos| with_field_appearances(evopdf_annot::with_missing_appearances(&cos), &cos))
             .and_then(|display| write_incremental(&display, &SaveOptions::default()).ok())
             .map(Arc::new)
     })
@@ -1020,12 +1020,12 @@ pub fn display_bytes_for(bytes: Arc<Vec<u8>>, password: Option<&str>) -> Arc<Vec
 pub fn render_password_for(bytes: Arc<Vec<u8>>, password: Option<&str>) -> Option<String> {
     let password = password?;
     let recovered =
-        guard(|| pdfcraft_cos::Document::open_with_password(bytes, Some(password)).ok().and_then(|d| recovered_render_password(&d))).ok().flatten();
+        guard(|| evopdf_cos::Document::open_with_password(bytes, Some(password)).ok().and_then(|d| recovered_render_password(&d))).ok().flatten();
     Some(recovered.unwrap_or_else(|| password.to_owned()))
 }
 
 /// The user password owner authentication recovered from an R2–R4 `cos`, as the renderer takes it.
-fn recovered_render_password(cos: &pdfcraft_cos::Document) -> Option<String> {
+fn recovered_render_password(cos: &evopdf_cos::Document) -> Option<String> {
     cos.security().and_then(|s| s.recovered_user_password()).map(|user| renderer_password(&user))
 }
 
@@ -1041,14 +1041,14 @@ fn recovered_render_password(cos: &pdfcraft_cos::Document) -> Option<String> {
 /// text is extracted, and a glyph still mostly inside a mark fails the edit: the caller keeps
 /// the document as it was.
 fn shown_under_redactions(
-    after: &pdfcraft_cos::Document,
-    marks: &[pdfcraft_redact::Mark],
-    overlays: &[pdfcraft_cos::ObjRef],
-    pages: &[pdfcraft_render::PageInfo],
+    after: &evopdf_cos::Document,
+    marks: &[evopdf_redact::Mark],
+    overlays: &[evopdf_cos::ObjRef],
+    pages: &[evopdf_render::PageInfo],
     password: Option<&str>,
 ) -> Result<(), EditError> {
-    use pdfcraft_cos::Object;
-    use pdfcraft_redact::RedactError;
+    use evopdf_cos::Object;
+    use evopdf_redact::RedactError;
     let mut marked: Vec<usize> = marks.iter().map(|m| m.page).collect();
     marked.sort_unstable();
     marked.dedup();
@@ -1056,7 +1056,7 @@ fn shown_under_redactions(
         return Ok(());
     }
     let mut shown = after.clone();
-    let model = pdfcraft_model::pages(&shown);
+    let model = evopdf_model::pages(&shown);
     for &pi in &marked {
         let Some(page) = model.get(pi) else { continue };
         let Some(Object::Array(list)) = page.dict.get(b"Contents").map(|c| (*shown.resolve(c)).clone()) else { continue };
@@ -1065,10 +1065,10 @@ fn shown_under_redactions(
     }
     let bytes = write_incremental(&shown, &SaveOptions::default()).map_err(|e| EditError::Write(e.to_string()))?;
     let config = RenderConfig { password: password.map(Arc::from), ..Default::default() };
-    let mut renderer = pdfcraft_render::PageRenderer::new(Arc::new(bytes), config);
+    let mut renderer = evopdf_render::PageRenderer::new(Arc::new(bytes), config);
     let mut residue = 0;
     for &pi in &marked {
-        let request = pdfcraft_render::RenderRequest { page: pi, kind: pdfcraft_render::RequestKind::Text, scale: 1.0, ..Default::default() };
+        let request = evopdf_render::RenderRequest { page: pi, kind: evopdf_render::RequestKind::Text, scale: 1.0, ..Default::default() };
         // A page that cannot be read back cannot be confirmed clean.
         let (Some(info), Some(text)) = (pages.get(pi), renderer.render(request).text) else { return Err(RedactError::Unreadable(pi + 1).into()) };
         let rects: Vec<[f64; 4]> = marks
@@ -1105,8 +1105,8 @@ fn render_threads() -> usize {
 /// made for printing): `/BaseState /ON`, `/ON` the visible layers, `/OFF` the hidden ones. Its
 /// other entries (`/Order`, `/RBGroups`, `/AS`…) are kept. A document without `/OCProperties`
 /// is left alone.
-fn set_default_layer_state(cos: &mut pdfcraft_cos::Document, layers: &[Layer]) {
-    use pdfcraft_cos::{Dict, ObjRef, Object};
+fn set_default_layer_state(cos: &mut evopdf_cos::Document, layers: &[Layer]) {
+    use evopdf_cos::{Dict, ObjRef, Object};
     let Some(root_ref) = cos.trailer().get(b"Root").and_then(Object::as_ref) else { return };
     let Some(mut root) = cos.get(root_ref).as_dict().cloned() else { return };
     let Some(properties) = root.get(b"OCProperties").cloned() else { return };
@@ -1175,8 +1175,8 @@ pub struct BookmarkRow {
     pub open: bool,
     /// The 0-based page it goes to.
     pub page: Option<usize>,
-    /// Where on that page it goes ([`pdfcraft_render::DestView::Top`] when it doesn't say).
-    pub view: pdfcraft_render::DestView,
+    /// Where on that page it goes ([`evopdf_render::DestView::Top`] when it doesn't say).
+    pub view: evopdf_render::DestView,
     /// The title's colour (`/C`), `None` for the default black, and its style (`/F`).
     pub color: Option<[f32; 3]>,
     pub italic: bool,
@@ -1195,10 +1195,10 @@ pub struct BookmarkPage {
 }
 
 /// The rows of a viewer outline, in outline order, with their paths.
-fn outline_rows(items: &[pdfcraft_render::OutlineItem]) -> Vec<BookmarkRow> {
+fn outline_rows(items: &[evopdf_render::OutlineItem]) -> Vec<BookmarkRow> {
     let mut rows = Vec::new();
     // One entry per open level: its items, and how many of them have been listed.
-    let mut levels: Vec<(&[pdfcraft_render::OutlineItem], usize)> = vec![(items, 0)];
+    let mut levels: Vec<(&[evopdf_render::OutlineItem], usize)> = vec![(items, 0)];
     while let Some(&(list, next)) = levels.last() {
         let Some(item) = list.get(next) else {
             levels.pop();
@@ -1244,7 +1244,7 @@ pub struct SecuritySummary {
     /// Opened with the owner password (no restrictions apply).
     pub owner: bool,
     /// For pending protection: the restrictions as they will apply to others.
-    pub permissions: pdfcraft_cos::Permissions,
+    pub permissions: evopdf_cos::Permissions,
     /// Set in this session; written by the next save.
     pub pending: bool,
 }
@@ -1286,7 +1286,7 @@ pub struct Protection {
     /// "Enable text access for screen reader devices".
     pub accessibility: bool,
     /// Compatibility level; AES-256 (Acrobat X and later) by default.
-    pub algorithm: pdfcraft_cos::Algorithm,
+    pub algorithm: evopdf_cos::Algorithm,
     /// `false`: "Encrypt all document contents except metadata".
     pub encrypt_metadata: bool,
 }
@@ -1317,7 +1317,7 @@ impl Default for Protection {
             changes: Changes::None,
             copy: false,
             accessibility: true,
-            algorithm: pdfcraft_cos::Algorithm::Aes256,
+            algorithm: evopdf_cos::Algorithm::Aes256,
             encrypt_metadata: true,
         }
     }
@@ -1362,7 +1362,7 @@ impl Protection {
         if [&self.open_password, &self.permissions_password].into_iter().flatten().any(String::is_empty) {
             return bad("passwords can't be empty");
         }
-        if self.algorithm != pdfcraft_cos::Algorithm::Aes256
+        if self.algorithm != evopdf_cos::Algorithm::Aes256
             && [&self.open_password, &self.permissions_password].into_iter().flatten().any(|p| p.chars().any(|c| !(' '..='~').contains(&c)))
         {
             return bad("this compatibility level supports only plain ASCII passwords; use AES-256 (Acrobat X and later)");
@@ -1371,7 +1371,7 @@ impl Protection {
         // which drops soft hyphens and folds compatibility forms; older levels: the first 32
         // bytes, padded). One that comes out as the empty password opens the file without asking,
         // and an open password that comes out as the permissions password lifts the restrictions.
-        let effective = |p: &str| pdfcraft_cos::effective_password(self.algorithm, p);
+        let effective = |p: &str| evopdf_cos::effective_password(self.algorithm, p);
         let (open, permissions) = (self.open_password.as_deref().map(effective), self.permissions_password.as_deref().map(effective));
         let empty = effective("");
         if open.iter().chain(&permissions).any(|p| *p == empty) {
@@ -1444,7 +1444,7 @@ pub enum Edit {
         pages: Option<Vec<usize>>,
         at: usize,
         /// How a form field whose name the document already uses is kept separate.
-        field_conflicts: pdfcraft_organize::FieldConflicts,
+        field_conflicts: evopdf_organize::FieldConflicts,
     },
     /// Add a bookmark to `page` as child `index` of the bookmark at `parent` (`[]` = top level).
     /// It goes to the user-space point (`left`, `top`) of the page at the reader's zoom, and
@@ -1495,7 +1495,7 @@ pub enum Edit {
     NumberPages {
         from: usize,
         to: usize,
-        style: pdfcraft_organize::LabelStyle,
+        style: evopdf_organize::LabelStyle,
         prefix: String,
         first: u32,
     },
@@ -1599,7 +1599,7 @@ pub enum Edit {
         opacity: Option<f64>,
         width: Option<f64>,
         /// Line or polyline: two endings. Callout: one. `None` leaves `/LE` unchanged.
-        endings: Option<Vec<pdfcraft_annot::LineEnding>>,
+        endings: Option<Vec<evopdf_annot::LineEnding>>,
     },
     /// Fill a rectangle, oval or polygon comment, or remove its fill (`None`).
     FillAnnotation {
@@ -1687,14 +1687,14 @@ pub enum Edit {
     AutoTagFormFields,
     /// Change one property on a reachable indirect structure tag.
     SetTagProperty {
-        object: pdfcraft_cos::ObjRef,
+        object: evopdf_cos::ObjRef,
         property: a11y::TagProperty,
         value: Option<String>,
     },
     /// Move a structure tag before or after a direct sibling in reading order.
     MoveTag {
-        object: pdfcraft_cos::ObjRef,
-        anchor: pdfcraft_cos::ObjRef,
+        object: evopdf_cos::ObjRef,
+        anchor: evopdf_cos::ObjRef,
         placement: a11y::TagPlacement,
     },
     /// Add alternate text ▸ Decorative figure: the figure's content becomes an artifact.
@@ -1703,7 +1703,7 @@ pub enum Edit {
     },
     /// Tags panel ▸ Mark as artifact: retire a leaf tag and mark its content as an artifact.
     MarkTagArtifact {
-        object: pdfcraft_cos::ObjRef,
+        object: evopdf_cos::ObjRef,
     },
     /// Document JavaScripts: add, replace (`script`) or remove (`None`) the document-level
     /// script `name`.
@@ -1721,7 +1721,7 @@ pub enum Edit {
     /// Standards ▸ Save as PDF/A: fix what can be fixed for `level` (metadata, output intent,
     /// forbidden actions, annotation flags, …).
     ConvertPdfA {
-        level: pdfcraft_preflight::Level,
+        level: evopdf_preflight::Level,
     },
     /// Remove what identifies the document as meeting `standard` (PDF/A or PDF/X).
     RemoveStandardId {
@@ -1730,7 +1730,7 @@ pub enum Edit {
     /// What a script (button or console) changed in form fields: values, read-only, required
     /// and visibility.
     ApplyScriptChanges {
-        changes: Vec<pdfcraft_forms::FieldChange>,
+        changes: Vec<evopdf_forms::FieldChange>,
     },
     /// An XFA form's scripted event (a button's `click`, say) on the object at `som`: what the
     /// script changes (values, rows, visibility) is applied and the form laid out again.
@@ -1742,7 +1742,7 @@ pub enum Edit {
     /// image (from [`ocr::OcrJob::run`]).
     AddOcrText {
         page: usize,
-        words: Vec<pdfcraft_ocr::PlacedWord>,
+        words: Vec<evopdf_ocr::PlacedWord>,
     },
     /// Edit a PDF ▸ Edit text: replace the text of line `line` (from `Document::text_lines`) on
     /// `page`, in its own font when it can show it, else in Helvetica.
@@ -1771,7 +1771,7 @@ pub enum Edit {
         block: usize,
         text: String,
         /// Formatting changes (font, size, colour, alignment); default keeps the paragraph's.
-        style: pdfcraft_edit::BlockStyle,
+        style: evopdf_edit::BlockStyle,
     },
     /// An explicit open-licensed full font program, completing subsets or selected by a user.
     RegisterTextFont {
@@ -1898,7 +1898,7 @@ pub enum Edit {
     /// Sanitize Document: every category, then a full rewrite on save.
     Sanitize,
     /// An XFA form made an ordinary (static) PDF form: the XFA packets, `/NeedsRendering` and
-    /// PdfCraft's private keys go, the pages as laid out and the fields with their values
+    /// EvoPdf's private keys go, the pages as laid out and the fields with their values
     /// stay, so every viewer shows the same form and none lays it out again. Its scripts no
     /// longer run.
     XfaToStatic,
@@ -2146,7 +2146,7 @@ impl Edit {
             Edit::SetPageBox { pages, which: PageBox::Crop, .. } => plural("Crop page", "Crop pages", pages.len()),
             Edit::SetPageBox { .. } => Label::of("Set page boxes"),
             Edit::SetTransition { .. } => Label::of("Set page transitions"),
-            // The four `/Info` keys PdfCraft itself offers get a wording of their own, so each can
+            // The four `/Info` keys EvoPdf itself offers get a wording of their own, so each can
             // be said in another language; any other key is the document's and goes in as it stands.
             Edit::SetInfo { key, .. } => match key.as_str() {
                 "Title" => Label::of("Change Title"),
@@ -2168,9 +2168,9 @@ impl Edit {
             Edit::NumberPages { .. } => Label::of("Number pages"),
             // What was measured is part of the wording too, for the same reason.
             Edit::AddMeasurement(m) => Label::of(match m.kind {
-                pdfcraft_measure::Kind::Distance => "Measure distance",
-                pdfcraft_measure::Kind::Perimeter => "Measure perimeter",
-                pdfcraft_measure::Kind::Area => "Measure area",
+                evopdf_measure::Kind::Distance => "Measure distance",
+                evopdf_measure::Kind::Perimeter => "Measure perimeter",
+                evopdf_measure::Kind::Area => "Measure area",
             }),
             Edit::SetMeasurementScale { .. } => Label::of("Set measurement scale"),
             Edit::AddAnnotation(a) => Label::of(add_annotation(&a.shape)),
@@ -2310,13 +2310,13 @@ fn add_annotation(s: &Shape) -> &'static str {
 
 /// Opened as owner, or nothing is restricted (no permissions password was set): security may
 /// be changed, as in Acrobat.
-fn unrestricted(p: &pdfcraft_cos::Permissions) -> bool {
+fn unrestricted(p: &evopdf_cos::Permissions) -> bool {
     const ALL: i32 = 0b1111_0011_1100; // bits 3–6 and 9–12
     p.owner || p.bits & ALL == ALL
 }
 
 /// Whether the opening password allows an edit (§7.6.4.2, Table 22).
-fn check_permission(edit: &Edit, p: &pdfcraft_cos::Permissions) -> Result<(), EditError> {
+fn check_permission(edit: &Edit, p: &evopdf_cos::Permissions) -> Result<(), EditError> {
     match edit {
         Edit::RotatePages { .. }
         | Edit::DeletePages { .. }
@@ -2458,10 +2458,10 @@ struct EditCtx {
     js: Option<js::JsRunner>,
     /// A laid-out XFA form's template (`None`: not an XFA form, or JavaScript is off) and what
     /// its scripts produced.
-    xfa: Option<Arc<pdfcraft_xfa::model::Template>>,
+    xfa: Option<Arc<evopdf_xfa::model::Template>>,
     xfa_out: js::JsOutput,
     /// The datasets stream this edit wrote (later writes in the edit replace it in place).
-    xfa_datasets: Option<pdfcraft_cos::ObjRef>,
+    xfa_datasets: Option<evopdf_cos::ObjRef>,
     /// A form script ran too long and was abandoned: the document's scripts go off.
     xfa_ran_away: bool,
     /// The edit took the XFA out of the form: what went with it, for the document's warnings.
@@ -2478,7 +2478,7 @@ struct EditCtx {
     renamed_fields: Vec<(String, String)>,
     /// The overlay streams the edit's applied redactions added, which alone the renderer's check
     /// leaves out.
-    redaction_overlays: Vec<pdfcraft_cos::ObjRef>,
+    redaction_overlays: Vec<evopdf_cos::ObjRef>,
 }
 
 impl EditCtx {
@@ -2500,7 +2500,7 @@ impl EditCtx {
             xfa_ran_away: false,
             xfa_removed: Vec::new(),
             pages: 0,
-            date: now.map(pdfcraft_cos::pdf_date),
+            date: now.map(evopdf_cos::pdf_date),
             today: (1970, 1, 1),
             seed,
             count: 0,
@@ -2525,7 +2525,7 @@ impl EditCtx {
     }
 
     /// A fresh `/NM`: a random-looking UUID (version 4 layout) from a splitmix64 stream.
-    fn meta(&mut self) -> pdfcraft_annot::Meta {
+    fn meta(&mut self) -> evopdf_annot::Meta {
         let mut next = || {
             self.count += 1;
             let mut z = self.seed.wrapping_add(self.count.wrapping_mul(0x9E37_79B9_7F4A_7C15));
@@ -2542,70 +2542,70 @@ impl EditCtx {
             0x8000 | (b >> 48) & 0x3fff,
             b & 0xffff_ffff_ffff
         );
-        pdfcraft_annot::Meta { date: self.date.clone(), id }
+        evopdf_annot::Meta { date: self.date.clone(), id }
     }
 }
 
 /// Perform an edit on a working copy (the caller discards it on error).
-fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> Result<(), EditError> {
+fn run_edit(doc: &mut evopdf_cos::Document, edit: &Edit, cx: &mut EditCtx) -> Result<(), EditError> {
     match edit {
-        Edit::RotatePages { pages, degrees } => pdfcraft_organize::rotate_pages(doc, pages, *degrees)?,
-        Edit::DeletePages { pages } => pdfcraft_organize::delete_pages(doc, pages)?,
-        Edit::MovePages { pages, to } => pdfcraft_organize::move_pages(doc, pages, *to)?,
-        Edit::ReversePages { pages } => pdfcraft_organize::reverse_pages(doc, pages)?,
+        Edit::RotatePages { pages, degrees } => evopdf_organize::rotate_pages(doc, pages, *degrees)?,
+        Edit::DeletePages { pages } => evopdf_organize::delete_pages(doc, pages)?,
+        Edit::MovePages { pages, to } => evopdf_organize::move_pages(doc, pages, *to)?,
+        Edit::ReversePages { pages } => evopdf_organize::reverse_pages(doc, pages)?,
         Edit::InsertBlankPage { at, width, height } => {
-            pdfcraft_organize::insert_blank_page(doc, *at, *width, *height)?;
+            evopdf_organize::insert_blank_page(doc, *at, *width, *height)?;
         }
-        Edit::SetInfo { key, value } => pdfcraft_organize::set_info(doc, key, value)?,
-        Edit::DuplicatePages { pages, at } => pdfcraft_organize::duplicate_pages(doc, pages, *at)?,
+        Edit::SetInfo { key, value } => evopdf_organize::set_info(doc, key, value)?,
+        Edit::DuplicatePages { pages, at } => evopdf_organize::duplicate_pages(doc, pages, *at)?,
         Edit::ReplacePages { pages, name, bytes, src_pages } => {
             let src = open_source(name, bytes)?;
-            pdfcraft_organize::replace_pages(doc, pages, &src, src_pages)?;
+            evopdf_organize::replace_pages(doc, pages, &src, src_pages)?;
         }
-        Edit::SetPageBox { pages, which, spec } => pdfcraft_organize::set_page_box(doc, pages, *which, *spec)?,
-        Edit::SetTransition { pages, spec } => pdfcraft_organize::set_transition(doc, pages, spec)?,
+        Edit::SetPageBox { pages, which, spec } => evopdf_organize::set_page_box(doc, pages, *which, *spec)?,
+        Edit::SetTransition { pages, spec } => evopdf_organize::set_transition(doc, pages, spec)?,
         Edit::InsertPagesFrom { name, bytes, pages, at, field_conflicts } => {
             let src = open_source(name, bytes)?;
             let pages = match pages {
                 Some(p) => p.clone(),
-                None => (0..pdfcraft_organize::page_count(&src)?).collect(),
+                None => (0..evopdf_organize::page_count(&src)?).collect(),
             };
             // The file's bookmarks come along under one named after it, as in Combine Files.
             let title = std::path::Path::new(name).file_stem().map_or_else(|| name.clone(), |s| s.to_string_lossy().into_owned());
-            let outcome = pdfcraft_organize::insert_file_pages(doc, &src, &title, &pages, *at, *field_conflicts)?;
+            let outcome = evopdf_organize::insert_file_pages(doc, &src, &title, &pages, *at, *field_conflicts)?;
             cx.renamed_fields = outcome.renamed_fields;
         }
         Edit::AddBookmark { parent, index, title, page, left, top } => {
-            pdfcraft_organize::add_bookmark_at(doc, parent, *index, title, *page, *left, *top)?;
+            evopdf_organize::add_bookmark_at(doc, parent, *index, title, *page, *left, *top)?;
         }
-        Edit::RenameBookmark { path, title } => pdfcraft_organize::rename_bookmark(doc, path, title)?,
-        Edit::DeleteBookmark { path } => pdfcraft_organize::delete_bookmark(doc, path)?,
+        Edit::RenameBookmark { path, title } => evopdf_organize::rename_bookmark(doc, path, title)?,
+        Edit::DeleteBookmark { path } => evopdf_organize::delete_bookmark(doc, path)?,
         Edit::MoveBookmark { from, to_parent, index } => {
-            pdfcraft_organize::move_bookmark(doc, from, to_parent, *index)?;
+            evopdf_organize::move_bookmark(doc, from, to_parent, *index)?;
         }
-        Edit::SetBookmarkPage { path, page } => pdfcraft_organize::set_bookmark_page(doc, path, *page)?,
-        Edit::SetBookmarkColor { path, color } => pdfcraft_organize::set_bookmark_color(doc, path, *color)?,
-        Edit::SetBookmarkStyle { path, bold, italic } => pdfcraft_organize::set_bookmark_style(doc, path, *bold, *italic)?,
+        Edit::SetBookmarkPage { path, page } => evopdf_organize::set_bookmark_page(doc, path, *page)?,
+        Edit::SetBookmarkColor { path, color } => evopdf_organize::set_bookmark_color(doc, path, *color)?,
+        Edit::SetBookmarkStyle { path, bold, italic } => evopdf_organize::set_bookmark_style(doc, path, *bold, *italic)?,
         Edit::BookmarksFromStructure => {
-            let entries: Vec<_> = pdfcraft_a11y::headings(doc)
+            let entries: Vec<_> = evopdf_a11y::headings(doc)
                 .into_iter()
-                .map(|h| pdfcraft_organize::OutlineEntry { level: h.level, title: h.title, page: h.page, element: h.obj })
+                .map(|h| evopdf_organize::OutlineEntry { level: h.level, title: h.title, page: h.page, element: h.obj })
                 .collect();
-            pdfcraft_organize::add_bookmark_tree(doc, "Untitled", &entries)?;
+            evopdf_organize::add_bookmark_tree(doc, "Untitled", &entries)?;
         }
-        Edit::NumberPages { from, to, style, prefix, first } => pdfcraft_organize::number_pages(doc, *from, *to, *style, prefix, *first)?,
+        Edit::NumberPages { from, to, style, prefix, first } => evopdf_organize::number_pages(doc, *from, *to, *style, prefix, *first)?,
         Edit::AddMeasurement(m) => {
             measure::add(doc, m, &cx.meta())?;
         }
         Edit::SetMeasurementScale { page, bbox, name, scale } => measure::set_scale(doc, *page, *bbox, name, scale)?,
         Edit::AddAnnotation(a) => {
-            pdfcraft_annot::add_annotation(doc, a, &cx.meta())?;
+            evopdf_annot::add_annotation(doc, a, &cx.meta())?;
         }
         Edit::AddCustomStamp { page, rect, name, file, author } => {
             let src = mark_source(doc, file)?;
             let (sw, sh) = (src.size.0.max(1.0), src.size.1.max(1.0));
             let natural = rect[2] == rect[0] && rect[3] == rect[1];
-            let rotation = pdfcraft_organize::page_rotation(doc, *page)?;
+            let rotation = evopdf_organize::page_rotation(doc, *page)?;
             // The picture as displayed: a quarter turn swaps its sides in user space.
             let (dw, dh) = if matches!(rotation, 90 | 270) { (sh, sw) } else { (sw, sh) };
             let rect = if natural {
@@ -2616,58 +2616,58 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
                 fit_picture(*rect, dw, dh)
             };
             let shape = Shape::CustomStamp { rect, name: name.clone(), picture: src.xobject, image: src.image, size: (sw, sh) };
-            let style = pdfcraft_annot::Style::default_for(&shape);
+            let style = evopdf_annot::Style::default_for(&shape);
             let new = NewAnnotation { page: *page, shape, style, contents: name.clone(), author: author.clone() };
-            let index = pdfcraft_annot::add_annotation(doc, &new, &cx.meta())?;
-            pdfcraft_annot::orient_image_stamp(doc, *page, index, rotation)?;
+            let index = evopdf_annot::add_annotation(doc, &new, &cx.meta())?;
+            evopdf_annot::orient_image_stamp(doc, *page, index, rotation)?;
         }
-        Edit::DeleteAnnotation { page, index } => pdfcraft_annot::delete_annotation(doc, *page, *index)?,
-        Edit::SetAnnotationContents { page, index, text } => pdfcraft_annot::set_contents(doc, *page, *index, text, &cx.meta())?,
+        Edit::DeleteAnnotation { page, index } => evopdf_annot::delete_annotation(doc, *page, *index)?,
+        Edit::SetAnnotationContents { page, index, text } => evopdf_annot::set_contents(doc, *page, *index, text, &cx.meta())?,
         Edit::ReplyToAnnotation { page, index, text, author } => {
-            pdfcraft_annot::add_reply(doc, *page, *index, text, author, &cx.meta())?;
+            evopdf_annot::add_reply(doc, *page, *index, text, author, &cx.meta())?;
         }
         Edit::SetAnnotationStatus { page, index, state, author } => {
-            pdfcraft_annot::set_review_state(doc, *page, *index, *state, author, &cx.meta())?;
+            evopdf_annot::set_review_state(doc, *page, *index, *state, author, &cx.meta())?;
         }
         Edit::EraseInk { page, index, path, radius } => {
-            pdfcraft_annot::erase_ink(doc, *page, *index, path, *radius, &cx.meta())?;
+            evopdf_annot::erase_ink(doc, *page, *index, path, *radius, &cx.meta())?;
         }
         Edit::AddAttachment { name, bytes, description, mime } => {
-            pdfcraft_organize::add_attachment(doc, name, bytes, description.as_deref(), mime.as_deref(), cx.date.as_deref())?;
+            evopdf_organize::add_attachment(doc, name, bytes, description.as_deref(), mime.as_deref(), cx.date.as_deref())?;
         }
-        Edit::DeleteAttachment { key } => pdfcraft_organize::delete_attachment(doc, key)?,
+        Edit::DeleteAttachment { key } => evopdf_organize::delete_attachment(doc, key)?,
         Edit::ReplaceText { page, quads, text, author, strike, caret } => {
             // One `/NM` each: the caret replies to the strikeout, and XFDF names that reply by
             // the strikeout's `/NM` (#2666).
             let (strike_meta, caret_meta) = (cx.meta(), cx.meta());
-            pdfcraft_annot::add_text_replacement(doc, *page, quads, text, author, strike, caret, &strike_meta, &caret_meta)?;
+            evopdf_annot::add_text_replacement(doc, *page, quads, text, author, strike, caret, &strike_meta, &caret_meta)?;
         }
         Edit::MarkAnnotation { page, index, marked, author } => {
-            pdfcraft_annot::set_marked(doc, *page, *index, *marked, author, &cx.meta())?;
+            evopdf_annot::set_marked(doc, *page, *index, *marked, author, &cx.meta())?;
         }
-        Edit::LockAnnotation { page, index, locked } => pdfcraft_annot::set_locked(doc, *page, *index, *locked)?,
-        Edit::MoveAnnotation { page, index, dx, dy } => pdfcraft_annot::move_annotation(doc, *page, *index, *dx, *dy, &cx.meta())?,
-        Edit::ReshapeAnnotation { page, index, points } => pdfcraft_annot::set_points(doc, *page, *index, points, &cx.meta())?,
-        Edit::ResizeAnnotation { page, index, rect } => pdfcraft_annot::set_rect(doc, *page, *index, *rect, &cx.meta())?,
+        Edit::LockAnnotation { page, index, locked } => evopdf_annot::set_locked(doc, *page, *index, *locked)?,
+        Edit::MoveAnnotation { page, index, dx, dy } => evopdf_annot::move_annotation(doc, *page, *index, *dx, *dy, &cx.meta())?,
+        Edit::ReshapeAnnotation { page, index, points } => evopdf_annot::set_points(doc, *page, *index, points, &cx.meta())?,
+        Edit::ResizeAnnotation { page, index, rect } => evopdf_annot::set_rect(doc, *page, *index, *rect, &cx.meta())?,
         Edit::StyleAnnotation { page, index, color, opacity, width, endings } => {
-            pdfcraft_annot::set_style(doc, *page, *index, *color, *opacity, *width, endings.as_deref(), &cx.meta())?;
+            evopdf_annot::set_style(doc, *page, *index, *color, *opacity, *width, endings.as_deref(), &cx.meta())?;
         }
-        Edit::FillAnnotation { page, index, fill } => pdfcraft_annot::set_fill(doc, *page, *index, *fill, &cx.meta())?,
-        Edit::FontSizeAnnotation { page, index, size } => pdfcraft_annot::set_font_size(doc, *page, *index, *size, &cx.meta())?,
+        Edit::FillAnnotation { page, index, fill } => evopdf_annot::set_fill(doc, *page, *index, *fill, &cx.meta())?,
+        Edit::FontSizeAnnotation { page, index, size } => evopdf_annot::set_font_size(doc, *page, *index, *size, &cx.meta())?,
         Edit::SetAnnotationInfo { page, index, author, subject, icon } => {
-            pdfcraft_annot::set_info(doc, *page, *index, author.as_deref(), subject.as_deref(), *icon, &cx.meta())?;
+            evopdf_annot::set_info(doc, *page, *index, author.as_deref(), subject.as_deref(), *icon, &cx.meta())?;
         }
         Edit::SetFieldValue { name, value } => {
-            let mut set = |doc: &mut pdfcraft_cos::Document, value: &FieldValue| match cx.js.as_mut() {
-                Some(js) => pdfcraft_forms::set_value_with(doc, name, value, js),
-                None => pdfcraft_forms::set_value(doc, name, value),
+            let mut set = |doc: &mut evopdf_cos::Document, value: &FieldValue| match cx.js.as_mut() {
+                Some(js) => evopdf_forms::set_value_with(doc, name, value, js),
+                None => evopdf_forms::set_value(doc, name, value),
             };
             match set(doc, value) {
                 Ok(()) => {}
                 // A date the field's format doesn't read may be typed by another of an XFA date
                 // field's patterns: it is kept in the first. Only a format refusal is tried
                 // again: it comes before any of the field's scripts run, so they run once.
-                Err(refused @ pdfcraft_forms::FormError::Format(_)) => match xfa::typed_date(doc, cx.xfa.as_deref(), name, value) {
+                Err(refused @ evopdf_forms::FormError::Format(_)) => match xfa::typed_date(doc, cx.xfa.as_deref(), name, value) {
                     Some(typed) => set(doc, &typed)?,
                     None => return Err(refused.into()),
                 },
@@ -2675,8 +2675,8 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             }
         }
         Edit::ApplyScriptChanges { changes } => match cx.js.as_mut() {
-            Some(js) => pdfcraft_forms::apply_script_changes(doc, changes, js)?,
-            None => pdfcraft_forms::apply_script_changes(doc, changes, &mut pdfcraft_forms::NoScripts)?,
+            Some(js) => evopdf_forms::apply_script_changes(doc, changes, js)?,
+            None => evopdf_forms::apply_script_changes(doc, changes, &mut evopdf_forms::NoScripts)?,
         },
         Edit::XfaEvent { som, activity } => {
             let tpl = cx.xfa.clone().ok_or_else(|| EditError::Invalid("this is not a laid-out XFA form, or JavaScript is off".into()))?;
@@ -2689,28 +2689,28 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
         Edit::SetFieldImage { name, image } => {
             let (img, _) = embed_image(doc, name, image)?;
             let px = match &*doc.get(img) {
-                pdfcraft_cos::Object::Stream(s) => (s.dict.int(b"Width").unwrap_or(1) as u32, s.dict.int(b"Height").unwrap_or(1) as u32),
+                evopdf_cos::Object::Stream(s) => (s.dict.int(b"Width").unwrap_or(1) as u32, s.dict.int(b"Height").unwrap_or(1) as u32),
                 _ => (1, 1),
             };
             // An XFA image field keeps the picture in the data too (as Designer saves it), and a
             // laid-out form shows it from there: so only pictures the layout can show, and only
             // for image fields (a laid-out one carries its SOM path; a static form's field name
             // is its path).
-            let is_xfa = pdfcraft_xfa::read_packets(doc).ok().flatten().is_some();
+            let is_xfa = evopdf_xfa::read_packets(doc).ok().flatten().is_some();
             let image_field = is_xfa
-                && pdfcraft_forms::fields(doc).iter().any(|f| f.name == *name && f.button == Some(pdfcraft_forms::af::ButtonAction::ImportIcon));
+                && evopdf_forms::fields(doc).iter().any(|f| f.name == *name && f.button == Some(evopdf_forms::af::ButtonAction::ImportIcon));
             if image_field {
                 let Some(content_type) = image_content_type(image) else {
                     return Err(EditError::Invalid(format!("{name}: an XFA form keeps a PNG, JPEG, GIF, BMP or TIFF picture; choose one of those")));
                 };
-                pdfcraft_forms::set_button_icon(doc, name, img, px)?;
-                let som = pdfcraft_xfa::fields_by_som(doc).into_iter().find(|(_, n)| n == name).map(|(s, _)| s).unwrap_or_else(|| name.clone());
+                evopdf_forms::set_button_icon(doc, name, img, px)?;
+                let som = evopdf_xfa::fields_by_som(doc).into_iter().find(|(_, n)| n == name).map(|(s, _)| s).unwrap_or_else(|| name.clone());
                 let path = match cx.xfa.as_deref() {
-                    Some(tpl) => pdfcraft_xfa::data_path(tpl, &som),
-                    None => pdfcraft_xfa::som_to_path(&som),
+                    Some(tpl) => evopdf_xfa::data_path(tpl, &som),
+                    None => evopdf_xfa::som_to_path(&som),
                 };
                 let r =
-                    pdfcraft_xfa::write_data_image(doc, &path, content_type, image, cx.xfa_datasets).map_err(|e| EditError::Write(e.to_string()))?;
+                    evopdf_xfa::write_data_image(doc, &path, content_type, image, cx.xfa_datasets).map_err(|e| EditError::Write(e.to_string()))?;
                 if !r.written && r.warnings.is_empty() {
                     return Err(EditError::Write(format!("{name}: the picture could not be written into the form's data")));
                 }
@@ -2718,40 +2718,40 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
                 cx.xfa_out.errors.extend(r.warnings);
                 xfa_after_data_change(doc, cx, false)?;
             } else {
-                pdfcraft_forms::set_button_icon(doc, name, img, px)?;
+                evopdf_forms::set_button_icon(doc, name, img, px)?;
             }
         }
         Edit::ResetForm { names } => {
-            pdfcraft_forms::reset(doc, names.as_deref())?;
+            evopdf_forms::reset(doc, names.as_deref())?;
         }
         Edit::AddField { page, rect, kind, name } => {
-            pdfcraft_forms::add_field(doc, *page, *rect, kind, name.as_deref())?;
+            evopdf_forms::add_field(doc, *page, *rect, kind, name.as_deref())?;
         }
         Edit::SetFieldProps { name, props } => {
-            pdfcraft_forms::set_props(doc, name, props)?;
+            evopdf_forms::set_props(doc, name, props)?;
         }
         Edit::DuplicateField { name, pages } => {
-            if pdfcraft_forms::duplicate_field(doc, name, pages)? == 0 {
-                return Err(EditError::Form(pdfcraft_forms::FormError::Invalid(format!("{name} is already on those pages"))));
+            if evopdf_forms::duplicate_field(doc, name, pages)? == 0 {
+                return Err(EditError::Form(evopdf_forms::FormError::Invalid(format!("{name} is already on those pages"))));
             }
         }
-        Edit::DeleteField { name } => pdfcraft_forms::delete_field(doc, name)?,
-        Edit::SetTabOrder { pages, order } => pdfcraft_forms::set_tab_order(doc, pages, *order)?,
-        Edit::MoveInTabOrder { name, earlier } => pdfcraft_forms::move_in_tab_order(doc, name, *earlier)?,
+        Edit::DeleteField { name } => evopdf_forms::delete_field(doc, name)?,
+        Edit::SetTabOrder { pages, order } => evopdf_forms::set_tab_order(doc, pages, *order)?,
+        Edit::MoveInTabOrder { name, earlier } => evopdf_forms::move_in_tab_order(doc, name, *earlier)?,
         // As after a script edit: the values the new order gives show at once.
         Edit::SetCalculationOrder { names } => {
-            pdfcraft_forms::set_calculation_order(doc, names)?;
+            evopdf_forms::set_calculation_order(doc, names)?;
             match cx.js.as_mut() {
-                Some(js) => pdfcraft_forms::recalculate_with(doc, js)?,
-                None => pdfcraft_forms::recalculate(doc)?,
+                Some(js) => evopdf_forms::recalculate_with(doc, js)?,
+                None => evopdf_forms::recalculate(doc)?,
             };
         }
-        Edit::SetInitialView(v) => pdfcraft_organize::set_initial_view(doc, v)?,
+        Edit::SetInitialView(v) => evopdf_organize::set_initial_view(doc, v)?,
         Edit::AutoTagText => {
             a11y::autotag_text(doc).map_err(|e| EditError::Accessibility(e.to_string()))?;
         }
         Edit::SetAltText { figure, alt } => {
-            let r = pdfcraft_cos::ObjRef::new(*figure, doc.generation(*figure));
+            let r = evopdf_cos::ObjRef::new(*figure, doc.generation(*figure));
             a11y::set_alt(doc, r, alt.as_deref()).map_err(|e| EditError::Accessibility(e.to_string()))?;
         }
         Edit::AutoTagFormFields => {
@@ -2764,39 +2764,39 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             a11y::move_tag(doc, *object, *anchor, *placement).map_err(|e| EditError::Accessibility(e.to_string()))?;
         }
         Edit::EditTextLine { page, line, text } => {
-            pdfcraft_edit::replace_line(doc, *page, *line, text)?;
+            evopdf_edit::replace_line(doc, *page, *line, text)?;
         }
         Edit::SetFieldScript { name, event, script } => {
-            pdfcraft_forms::set_field_script(doc, name, event, script.as_deref())?;
+            evopdf_forms::set_field_script(doc, name, event, script.as_deref())?;
             match cx.js.as_mut() {
-                Some(js) => pdfcraft_forms::recalculate_with(doc, js)?,
-                None => pdfcraft_forms::recalculate(doc)?,
+                Some(js) => evopdf_forms::recalculate_with(doc, js)?,
+                None => evopdf_forms::recalculate(doc)?,
             };
         }
         Edit::ConvertPdfA { level } => {
-            pdfcraft_preflight::convert(doc, *level).map_err(|e| EditError::Invalid(e.to_string()))?;
+            evopdf_preflight::convert(doc, *level).map_err(|e| EditError::Invalid(e.to_string()))?;
         }
-        Edit::RemoveStandardId { standard } => pdfcraft_organize::remove_standard_id(doc, *standard)?,
-        Edit::SetDocumentScript { name, script } => pdfcraft_forms::set_document_script(doc, name, script.as_deref())?,
+        Edit::RemoveStandardId { standard } => evopdf_organize::remove_standard_id(doc, *standard)?,
+        Edit::SetDocumentScript { name, script } => evopdf_forms::set_document_script(doc, name, script.as_deref())?,
         Edit::AddOcrText { page, words } => {
-            pdfcraft_edit::stamp(doc, *page, "OCR", pdfcraft_ocr::text_layer(words))?;
+            evopdf_edit::stamp(doc, *page, "OCR", evopdf_ocr::text_layer(words))?;
         }
         Edit::EditPageImage { page, index, change } => {
-            let img = pdfcraft_edit::page_images(doc, *page)?
+            let img = evopdf_edit::page_images(doc, *page)?
                 .into_iter()
                 .nth(*index)
-                .ok_or_else(|| EditError::Edit(pdfcraft_edit::EditError::Invalid(format!("page {} has no image {}", page + 1, index + 1))))?;
+                .ok_or_else(|| EditError::Edit(evopdf_edit::EditError::Invalid(format!("page {} has no image {}", page + 1, index + 1))))?;
             let c = match change {
-                ImageEdit::Move(to) => pdfcraft_edit::ImageChange::Transform(pdfcraft_edit::rect_to_rect(img.rect, *to)),
+                ImageEdit::Move(to) => evopdf_edit::ImageChange::Transform(evopdf_edit::rect_to_rect(img.rect, *to)),
                 ImageEdit::Rotate(q) => {
-                    pdfcraft_edit::ImageChange::Transform(pdfcraft_edit::turn_about_centre(img.visible_rect.unwrap_or(img.rect), *q, false, false))
+                    evopdf_edit::ImageChange::Transform(evopdf_edit::turn_about_centre(img.visible_rect.unwrap_or(img.rect), *q, false, false))
                 }
                 ImageEdit::RotateBy(degrees) => {
-                    let t = pdfcraft_edit::turn_by_degrees(img.visible_rect.unwrap_or(img.rect), *degrees)
-                        .ok_or_else(|| EditError::Edit(pdfcraft_edit::EditError::Invalid("the rotation angle must be a finite number".into())))?;
-                    pdfcraft_edit::ImageChange::Transform(t)
+                    let t = evopdf_edit::turn_by_degrees(img.visible_rect.unwrap_or(img.rect), *degrees)
+                        .ok_or_else(|| EditError::Edit(evopdf_edit::EditError::Invalid("the rotation angle must be a finite number".into())))?;
+                    evopdf_edit::ImageChange::Transform(t)
                 }
-                ImageEdit::Flip { horizontal } => pdfcraft_edit::ImageChange::Transform(pdfcraft_edit::turn_about_centre(
+                ImageEdit::Flip { horizontal } => evopdf_edit::ImageChange::Transform(evopdf_edit::turn_about_centre(
                     img.visible_rect.unwrap_or(img.rect),
                     0,
                     *horizontal,
@@ -2804,26 +2804,26 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
                 )),
                 ImageEdit::Replace { name, bytes } => {
                     if img.is_form {
-                        return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid(
+                        return Err(EditError::Edit(evopdf_edit::EditError::Invalid(
                             "grouped Form artwork cannot be replaced with a bitmap".into(),
                         )));
                     }
-                    pdfcraft_edit::ImageChange::Replace(embed_image(doc, name, bytes)?.0)
+                    evopdf_edit::ImageChange::Replace(embed_image(doc, name, bytes)?.0)
                 }
-                ImageEdit::Crop(keep) => pdfcraft_edit::ImageChange::Crop(*keep),
-                ImageEdit::Delete => pdfcraft_edit::ImageChange::Delete,
+                ImageEdit::Crop(keep) => evopdf_edit::ImageChange::Crop(*keep),
+                ImageEdit::Delete => evopdf_edit::ImageChange::Delete,
             };
-            pdfcraft_edit::change_image(doc, *page, *index, &c)?;
+            evopdf_edit::change_image(doc, *page, *index, &c)?;
         }
-        Edit::MoveObjects { page, objects, offset } => pdfcraft_edit::move_objects(doc, *page, objects, *offset)?,
+        Edit::MoveObjects { page, objects, offset } => evopdf_edit::move_objects(doc, *page, objects, *offset)?,
         Edit::EditTextBlock { page, block, text, style } => {
-            pdfcraft_edit::rewrite_block(doc, *page, *block, Some(text), style)?;
+            evopdf_edit::rewrite_block(doc, *page, *block, Some(text), style)?;
         }
         Edit::RegisterTextFont { page, bytes } => {
-            pdfcraft_edit::text::register_text_font(doc, *page, bytes)?;
+            evopdf_edit::text::register_text_font(doc, *page, bytes)?;
         }
         Edit::MarkDecorative { figure } => {
-            let r = pdfcraft_cos::ObjRef::new(*figure, doc.generation(*figure));
+            let r = evopdf_cos::ObjRef::new(*figure, doc.generation(*figure));
             a11y::mark_decorative(doc, r).map_err(|e| EditError::Accessibility(e.to_string()))?;
         }
         Edit::MarkTagArtifact { object } => {
@@ -2831,61 +2831,61 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
         }
         Edit::AddHeaderFooter { pages, settings, replace } => {
             let date = cx.today;
-            pdfcraft_edit::add_header_footer(doc, pages, settings, *replace, &pdfcraft_edit::Context { date })?;
+            evopdf_edit::add_header_footer(doc, pages, settings, *replace, &evopdf_edit::Context { date })?;
         }
         Edit::AddWatermark { pages, settings, replace, file } => {
             let mut s = settings.clone();
             if let Some(f) = file {
                 s.source = Some(mark_source(doc, f)?);
             }
-            pdfcraft_edit::add_watermark(doc, pages, &s, *replace)?
+            evopdf_edit::add_watermark(doc, pages, &s, *replace)?
         }
         Edit::AddBackground { pages, settings, replace, file } => {
             let mut s = settings.clone();
             if let Some(f) = file {
                 s.source = Some(mark_source(doc, f)?);
             }
-            pdfcraft_edit::add_background(doc, pages, &s, *replace)?
+            evopdf_edit::add_background(doc, pages, &s, *replace)?
         }
         Edit::RemoveMarks { kind } => {
-            let n = pdfcraft_model::pages(doc).len();
-            if pdfcraft_edit::remove_marks(doc, &(0..n).collect::<Vec<_>>(), *kind)? == 0 {
-                return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("there is nothing to remove".into())));
+            let n = evopdf_model::pages(doc).len();
+            if evopdf_edit::remove_marks(doc, &(0..n).collect::<Vec<_>>(), *kind)? == 0 {
+                return Err(EditError::Edit(evopdf_edit::EditError::Invalid("there is nothing to remove".into())));
             }
         }
         Edit::AddText { page, text } => {
-            pdfcraft_edit::add_content(doc, *page, &AddedContent::Text(text.clone()))?;
+            evopdf_edit::add_content(doc, *page, &AddedContent::Text(text.clone()))?;
         }
         Edit::AddImage { page, rect, name, bytes } => {
             let (image, natural) = embed_image(doc, name, bytes)?;
             let rect = match rect {
                 Some(r) => *r,
                 None => {
-                    let p = pdfcraft_model::pages(doc).swap_remove(*page);
+                    let p = evopdf_model::pages(doc).swap_remove(*page);
                     let (pw, ph) = p.display_size(doc);
                     let k = ((pw * 0.8) / natural.0).min((ph * 0.8) / natural.1).min(1.0);
                     let (w, h) = (natural.0 * k, natural.1 * k);
                     [(pw - w) / 2.0, (ph - h) / 2.0, (pw + w) / 2.0, (ph + h) / 2.0]
                 }
             };
-            pdfcraft_edit::add_content(doc, *page, &AddedContent::Image(pdfcraft_edit::AddedImage::new(rect, image)))?;
+            evopdf_edit::add_content(doc, *page, &AddedContent::Image(evopdf_edit::AddedImage::new(rect, image)))?;
         }
-        Edit::UpdateContent { page, index, content } => pdfcraft_edit::update_content(doc, *page, *index, content)?,
-        Edit::DeleteContent { page, index } => pdfcraft_edit::delete_content(doc, *page, *index)?,
+        Edit::UpdateContent { page, index, content } => evopdf_edit::update_content(doc, *page, *index, content)?,
+        Edit::DeleteContent { page, index } => evopdf_edit::delete_content(doc, *page, *index)?,
         Edit::ReplaceImage { page, index, name, bytes } => {
-            let item = pdfcraft_edit::list_added(doc).into_iter().filter(|a| a.page == *page).nth(*index);
+            let item = evopdf_edit::list_added(doc).into_iter().filter(|a| a.page == *page).nth(*index);
             let Some(AddedContent::Image(old)) = item.map(|a| a.content) else {
-                return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("that item is not an image".into())));
+                return Err(EditError::Edit(evopdf_edit::EditError::Invalid("that item is not an image".into())));
             };
             let (image, _) = embed_image(doc, name, bytes)?;
-            pdfcraft_edit::update_content(doc, *page, *index, &AddedContent::Image(pdfcraft_edit::AddedImage { image, ..old }))?;
+            evopdf_edit::update_content(doc, *page, *index, &AddedContent::Image(evopdf_edit::AddedImage { image, ..old }))?;
         }
         Edit::PasteContent { page, content, file } => {
             let content = match content {
                 AddedContent::Text(_) => content.clone(),
                 AddedContent::Image(img) => {
                     let Some((name, bytes)) = file else {
-                        return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("a pasted image needs its picture".into())));
+                        return Err(EditError::Edit(evopdf_edit::EditError::Invalid("a pasted image needs its picture".into())));
                     };
                     // The same picture in this document (copied here, pasted here before, or an
                     // identical file): drawn again from the one image object rather than stored twice.
@@ -2897,40 +2897,40 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
                             None => embed_image(doc, name, bytes)?.0,
                         }
                     };
-                    AddedContent::Image(pdfcraft_edit::AddedImage { image, ..img.clone() })
+                    AddedContent::Image(evopdf_edit::AddedImage { image, ..img.clone() })
                 }
             };
-            pdfcraft_edit::add_content(doc, *page, &content)?;
+            evopdf_edit::add_content(doc, *page, &content)?;
         }
         Edit::ApplyRedactions { pages } => {
-            cx.redaction_overlays = pdfcraft_redact::apply(doc, pages.as_deref())?.overlays;
+            cx.redaction_overlays = evopdf_redact::apply(doc, pages.as_deref())?.overlays;
         }
         Edit::ClearRedactions => {
-            pdfcraft_redact::clear_marks(doc, None)?;
+            evopdf_redact::clear_marks(doc, None)?;
         }
         Edit::AddLink { page, rect, action, style } => {
-            pdfcraft_annot::links::add(doc, *page, *rect, action, style)?;
+            evopdf_annot::links::add(doc, *page, *rect, action, style)?;
         }
-        Edit::SetLink { page, index, rect, action, style } => pdfcraft_annot::links::set(doc, *page, *index, *rect, action.as_ref(), style.as_ref())?,
-        Edit::DeleteLink { page, index } => pdfcraft_annot::links::delete(doc, *page, *index)?,
+        Edit::SetLink { page, index, rect, action, style } => evopdf_annot::links::set(doc, *page, *index, *rect, action.as_ref(), style.as_ref())?,
+        Edit::DeleteLink { page, index } => evopdf_annot::links::delete(doc, *page, *index)?,
         Edit::RemoveLinks { pages } => {
-            if pdfcraft_annot::links::remove_all(doc, pages.as_deref())? == 0 {
-                return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("there are no links to remove".into())));
+            if evopdf_annot::links::remove_all(doc, pages.as_deref())? == 0 {
+                return Err(EditError::Edit(evopdf_edit::EditError::Invalid("there are no links to remove".into())));
             }
         }
         Edit::AddLinks { links, style } => {
-            if pdfcraft_annot::links::add_many(doc, links, style)? == 0 {
-                return Err(EditError::Edit(pdfcraft_edit::EditError::Invalid("no web addresses were found".into())));
+            if evopdf_annot::links::add_many(doc, links, style)? == 0 {
+                return Err(EditError::Edit(evopdf_edit::EditError::Invalid("no web addresses were found".into())));
             }
         }
         Edit::ImportData { bytes, .. } => {
             // An XFA form takes XFA data files (XDP, datasets, or a data document) as its data;
             // XFDF, FDF, Acrobat's XML and tables go the usual way.
-            let text = (pdfcraft_xfa::read_packets(doc).ok().flatten().is_some()).then(|| decode_data_file(bytes)).flatten();
+            let text = (evopdf_xfa::read_packets(doc).ok().flatten().is_some()).then(|| decode_data_file(bytes)).flatten();
             match text {
                 Some(Ok(text)) if is_xfa_data_file(&text) => {
                     let expect_root = cx.xfa.as_ref().and_then(|t| t.root.common.name.clone());
-                    let r = pdfcraft_xfa::import_data(doc, &text, expect_root.as_deref(), cx.xfa_datasets)
+                    let r = evopdf_xfa::import_data(doc, &text, expect_root.as_deref(), cx.xfa_datasets)
                         .map_err(|e| EditError::Write(e.to_string()))?;
                     cx.xfa_datasets = r.stream.or(cx.xfa_datasets);
                     cx.xfa_out.errors.extend(r.warnings);
@@ -2939,23 +2939,23 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
                 }
                 Some(Err(why)) => return Err(EditError::Invalid(why)),
                 _ => {
-                    pdfcraft_xfdf::import(doc, bytes)?;
+                    evopdf_xfdf::import(doc, bytes)?;
                 }
             }
         }
         Edit::RemoveHidden { which } => {
-            pdfcraft_redact::sanitize::remove_hidden(doc, which)?;
+            evopdf_redact::sanitize::remove_hidden(doc, which)?;
         }
         Edit::Sanitize => {
-            pdfcraft_redact::sanitize::sanitize(doc)?;
+            evopdf_redact::sanitize::sanitize(doc)?;
         }
         Edit::Flatten { comments, fields } => {
             // An XFA form's fields baked into the pages: the XFA goes too, or Adobe's viewers
             // would lay the form out again from its template over the baked pages. A dynamic
             // form that was never laid out keeps its XFA: without it only placeholders remain.
-            let shape = (*fields).then(|| pdfcraft_xfa::xfa_shape(doc)).flatten();
-            let n = pdfcraft_model::pages(doc).len();
-            pdfcraft_edit::flatten(doc, &(0..n).collect::<Vec<_>>(), *comments, *fields)?;
+            let shape = (*fields).then(|| evopdf_xfa::xfa_shape(doc)).flatten();
+            let n = evopdf_model::pages(doc).len();
+            evopdf_edit::flatten(doc, &(0..n).collect::<Vec<_>>(), *comments, *fields)?;
             match shape {
                 Some(shape) if shape.strippable() => strip_xfa(doc, cx)?,
                 Some(_) => cx.xfa_removed.push("The XFA was kept: this dynamic form was not laid out, so its fields were not baked in".into()),
@@ -2963,7 +2963,7 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             }
         }
         Edit::XfaToStatic => {
-            let Some(shape) = pdfcraft_xfa::xfa_shape(doc) else {
+            let Some(shape) = evopdf_xfa::xfa_shape(doc) else {
                 return Err(EditError::Invalid("this document is not an XFA form".into()));
             };
             if !shape.strippable() {
@@ -2972,8 +2972,8 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             strip_xfa(doc, cx)?;
         }
         Edit::FlattenFillSign => {
-            let n = pdfcraft_model::pages(doc).len();
-            pdfcraft_edit::flatten_fill_sign(doc, &(0..n).collect::<Vec<_>>())?;
+            let n = evopdf_model::pages(doc).len();
+            evopdf_edit::flatten_fill_sign(doc, &(0..n).collect::<Vec<_>>())?;
         }
         Edit::Protect(p) => {
             p.validate()?;
@@ -2981,7 +2981,7 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
             // Without a permissions password nothing is restricted, so the owner password is a
             // random one nobody needs.
             let random_owner: String = cx.entropy().iter().map(|b| format!("{b:02x}")).collect();
-            let params = pdfcraft_cos::NewEncryption {
+            let params = evopdf_cos::NewEncryption {
                 algorithm: p.algorithm,
                 user_password: p.open_password.as_deref().unwrap_or(""),
                 owner_password: p.permissions_password.as_deref().unwrap_or(&random_owner),
@@ -3007,15 +3007,15 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
 }
 
 /// The comment list, read from the object graph (as `inspect` lists comments).
-fn comment_list(doc: &pdfcraft_cos::Document) -> Vec<pdfcraft_render::Annotation> {
-    let mut list: Vec<pdfcraft_render::Annotation> = pdfcraft_annot::summaries(doc)
+fn comment_list(doc: &evopdf_cos::Document) -> Vec<evopdf_render::Annotation> {
+    let mut list: Vec<evopdf_render::Annotation> = evopdf_annot::summaries(doc)
         .into_iter()
-        .map(|s| pdfcraft_render::Annotation {
+        .map(|s| evopdf_render::Annotation {
             page: s.page,
             subtype: s.subtype,
             author: s.author,
             contents: s.contents,
-            modified: s.modified.map(|m| pdfcraft_render::pretty_date(&m)),
+            modified: s.modified.map(|m| evopdf_render::pretty_date(&m)),
             name: s.name,
             in_reply_to: s.in_reply_to,
             parent: s.parent,
@@ -3032,7 +3032,7 @@ fn comment_list(doc: &pdfcraft_cos::Document) -> Vec<pdfcraft_render::Annotation
             points: s.points,
         })
         .collect();
-    pdfcraft_render::link_replies(&mut list);
+    evopdf_render::link_replies(&mut list);
     list
 }
 
@@ -3069,7 +3069,7 @@ fn keys_after(edit: &Edit) -> Option<Keys> {
 fn renderer_password(bytes: &[u8]) -> String {
     match std::str::from_utf8(bytes) {
         Ok(text) => text.to_owned(),
-        Err(_) => bytes.iter().map(|b| pdfcraft_cos::pdfdoc_char(*b)).collect(),
+        Err(_) => bytes.iter().map(|b| evopdf_cos::pdfdoc_char(*b)).collect(),
     }
 }
 
@@ -3078,18 +3078,18 @@ fn renderer_password(bytes: &[u8]) -> String {
 /// itself when it holds none. ISO 32000-2 §12.7.5.3, Table 231 (a note to the Password flag):
 /// "it is imperative that PDF processors never store the value of the text field in the PDF file
 /// if this flag is set". The open document keeps them in memory.
-fn writable(cos: &pdfcraft_cos::Document) -> Result<std::borrow::Cow<'_, pdfcraft_cos::Document>, EditError> {
-    let has_form_pw = pdfcraft_forms::has_password_values(cos);
-    let has_xfa_pw = pdfcraft_xfa::has_password_values(cos);
+fn writable(cos: &evopdf_cos::Document) -> Result<std::borrow::Cow<'_, evopdf_cos::Document>, EditError> {
+    let has_form_pw = evopdf_forms::has_password_values(cos);
+    let has_xfa_pw = evopdf_xfa::has_password_values(cos);
     if !has_form_pw && !has_xfa_pw {
         return Ok(std::borrow::Cow::Borrowed(cos));
     }
     let mut copy = cos.clone();
     if has_form_pw {
-        pdfcraft_forms::clear_password_values(&mut copy).map_err(|e| EditError::Write(e.to_string()))?;
+        evopdf_forms::clear_password_values(&mut copy).map_err(|e| EditError::Write(e.to_string()))?;
     }
     if has_xfa_pw {
-        pdfcraft_xfa::clear_password_values(&mut copy).map_err(|e| EditError::Write(e.to_string()))?;
+        evopdf_xfa::clear_password_values(&mut copy).map_err(|e| EditError::Write(e.to_string()))?;
     }
     Ok(std::borrow::Cow::Owned(copy))
 }
@@ -3104,12 +3104,12 @@ pub fn guard<T>(f: impl FnOnce() -> T) -> Result<T, String> {
 }
 
 /// Parse another PDF to copy pages from.
-fn open_source(name: &str, bytes: &Arc<Vec<u8>>) -> Result<pdfcraft_cos::Document, EditError> {
+fn open_source(name: &str, bytes: &Arc<Vec<u8>>) -> Result<evopdf_cos::Document, EditError> {
     open_source_with(name, bytes, None)
 }
 
 /// [`open_source`], authenticating with `password` (user or owner) for an encrypted file.
-fn open_source_with(name: &str, bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Result<pdfcraft_cos::Document, EditError> {
+fn open_source_with(name: &str, bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Result<evopdf_cos::Document, EditError> {
     source_document(bytes, password).map_err(|p| EditError::Source(format!("{name}: {p}")))
 }
 
@@ -3126,12 +3126,12 @@ pub enum SourceProblem {
     Unreadable(String),
 }
 
-fn source_document(bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Result<pdfcraft_cos::Document, SourceProblem> {
-    match std::panic::catch_unwind(|| pdfcraft_cos::Document::open_with_password(bytes.clone(), password)) {
+fn source_document(bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Result<evopdf_cos::Document, SourceProblem> {
+    match std::panic::catch_unwind(|| evopdf_cos::Document::open_with_password(bytes.clone(), password)) {
         Ok(Ok(d)) if d.permissions().is_some_and(|p| !p.assemble()) => Err(SourceProblem::NotPermitted),
         Ok(Ok(d)) => Ok(d),
-        Ok(Err(pdfcraft_cos::CosError::NeedsPassword)) => Err(SourceProblem::Password),
-        Ok(Err(pdfcraft_cos::CosError::WrongPassword)) => Err(SourceProblem::WrongPassword),
+        Ok(Err(evopdf_cos::CosError::NeedsPassword)) => Err(SourceProblem::Password),
+        Ok(Err(evopdf_cos::CosError::WrongPassword)) => Err(SourceProblem::WrongPassword),
         Ok(Err(e)) => Err(SourceProblem::Unreadable(e.to_string())),
         Err(_) => Err(SourceProblem::Unreadable("the file could not be read".into())),
     }
@@ -3147,8 +3147,8 @@ pub fn combine_source_check(bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Res
 /// The number of pages of `bytes`, opened with `password` (user or owner) if given, whatever
 /// its permissions allow; `None` when it can't be read.
 pub fn source_page_count(bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Option<usize> {
-    let doc = std::panic::catch_unwind(|| pdfcraft_cos::Document::open_with_password(bytes.clone(), password)).ok()?.ok()?;
-    pdfcraft_organize::page_count(&doc).ok()
+    let doc = std::panic::catch_unwind(|| evopdf_cos::Document::open_with_password(bytes.clone(), password)).ok()?.ok()?;
+    evopdf_organize::page_count(&doc).ok()
 }
 
 /// The singular or the plural wording, by count. Both are written out: a language forms its plural
@@ -3166,11 +3166,11 @@ pub enum EditError {
     #[error("the document's security settings don't allow {0}; open it with the owner password to make this change")]
     NotPermitted(&'static str),
     #[error("{0}")]
-    Organize(#[from] pdfcraft_organize::OrganizeError),
+    Organize(#[from] evopdf_organize::OrganizeError),
     #[error("{0}")]
-    Bookmark(#[from] pdfcraft_organize::OutlineError),
+    Bookmark(#[from] evopdf_organize::OutlineError),
     #[error("{0}")]
-    Comment(#[from] pdfcraft_annot::AnnotError),
+    Comment(#[from] evopdf_annot::AnnotError),
     #[error(transparent)]
     Measure(#[from] measure::MeasureError),
     #[error("{0}")]
@@ -3178,19 +3178,19 @@ pub enum EditError {
     #[error("the password is incorrect")]
     WrongPassword,
     #[error("{0}")]
-    Form(#[from] pdfcraft_forms::FormError),
+    Form(#[from] evopdf_forms::FormError),
     #[error(transparent)]
-    Redact(#[from] pdfcraft_redact::RedactError),
+    Redact(#[from] evopdf_redact::RedactError),
     #[error("{0}")]
     Print(String),
     #[error("{0}")]
     Accessibility(String),
     #[error(transparent)]
-    Data(#[from] pdfcraft_xfdf::DataError),
+    Data(#[from] evopdf_xfdf::DataError),
     #[error("{0}")]
-    Edit(#[from] pdfcraft_edit::EditError),
+    Edit(#[from] evopdf_edit::EditError),
     #[error("{0}")]
-    Create(#[from] pdfcraft_create::CreateError),
+    Create(#[from] evopdf_create::CreateError),
     #[error("the edited document could not be written: {0}")]
     Write(String),
     #[error("the edited document could not be reopened: {0}")]
@@ -3215,8 +3215,8 @@ pub enum EditError {
     Invalid(String),
 }
 
-impl From<pdfcraft_sign::SignError> for EditError {
-    fn from(e: pdfcraft_sign::SignError) -> Self {
+impl From<evopdf_sign::SignError> for EditError {
+    fn from(e: evopdf_sign::SignError) -> Self {
         EditError::Sign(e.to_string())
     }
 }
@@ -3271,8 +3271,8 @@ impl OpenContext {
 }
 
 /// Lay a dynamic XFA form out (pages and fields) and give its widgets appearances.
-fn xfa_layout(doc: &mut pdfcraft_cos::Document) -> Result<XfaLayout, String> {
-    let mut report = pdfcraft_xfa::render_into(doc).map_err(|e| e.to_string())?;
+fn xfa_layout(doc: &mut evopdf_cos::Document) -> Result<XfaLayout, String> {
+    let mut report = evopdf_xfa::render_into(doc).map_err(|e| e.to_string())?;
     xfa_redraw(doc)?;
     // The form's own values: one its field's font can't draw is drawn with `?` and reported.
     report.warnings.extend(undrawn_field_warnings(doc));
@@ -3281,20 +3281,20 @@ fn xfa_layout(doc: &mut pdfcraft_cos::Document) -> Result<XfaLayout, String> {
 
 /// Give the fields of a laid-out XFA form their appearances. A signed signature box keeps the
 /// picture its signer's application drew.
-pub(crate) fn xfa_redraw(doc: &mut pdfcraft_cos::Document) -> Result<(), String> {
-    for f in pdfcraft_forms::fields(doc) {
-        if f.kind == pdfcraft_forms::FieldKind::Signature && doc.get(f.obj).as_dict().is_some_and(|d| d.contains(b"V")) {
+pub(crate) fn xfa_redraw(doc: &mut evopdf_cos::Document) -> Result<(), String> {
+    for f in evopdf_forms::fields(doc) {
+        if f.kind == evopdf_forms::FieldKind::Signature && doc.get(f.obj).as_dict().is_some_and(|d| d.contains(b"V")) {
             continue;
         }
-        pdfcraft_forms::redraw_field(doc, &f.name).map_err(|e| format!("{}: {e}", f.name))?;
+        evopdf_forms::redraw_field(doc, &f.name).map_err(|e| format!("{}: {e}", f.name))?;
     }
     Ok(())
 }
 
-/// A warning for each field whose appearance PdfCraft drew with `?` for a character its font
+/// A warning for each field whose appearance EvoPdf drew with `?` for a character its font
 /// can't draw (laying out an XFA form's own values).
-fn undrawn_field_warnings(doc: &pdfcraft_cos::Document) -> Vec<String> {
-    pdfcraft_forms::undrawn_fields(doc)
+fn undrawn_field_warnings(doc: &evopdf_cos::Document) -> Vec<String> {
+    evopdf_forms::undrawn_fields(doc)
         .into_iter()
         .map(|(name, c)| {
             format!("form field {name:?} holds \"{}\" (U+{:04X}), which its font can't draw: it shows ? in its place", c.escape_debug(), u32::from(c))
@@ -3303,18 +3303,18 @@ fn undrawn_field_warnings(doc: &pdfcraft_cos::Document) -> Vec<String> {
 }
 
 /// The form's fields as the XFA data layer wants them.
-fn xfa_field_data(doc: &pdfcraft_cos::Document) -> Vec<pdfcraft_xfa::FieldDatum> {
-    use pdfcraft_forms::FieldKind as K;
-    pdfcraft_forms::fields(doc)
+fn xfa_field_data(doc: &evopdf_cos::Document) -> Vec<evopdf_xfa::FieldDatum> {
+    use evopdf_forms::FieldKind as K;
+    evopdf_forms::fields(doc)
         .into_iter()
         .map(|f| {
             let data = match f.kind {
-                K::Text | K::Combo | K::List => pdfcraft_xfa::FieldData::Text(f.value.join("\n")),
-                K::CheckBox => pdfcraft_xfa::FieldData::Check(!f.value.is_empty()),
-                K::Radio => pdfcraft_xfa::FieldData::Radio(f.value.first().cloned()),
-                K::PushButton | K::Signature => pdfcraft_xfa::FieldData::None,
+                K::Text | K::Combo | K::List => evopdf_xfa::FieldData::Text(f.value.join("\n")),
+                K::CheckBox => evopdf_xfa::FieldData::Check(!f.value.is_empty()),
+                K::Radio => evopdf_xfa::FieldData::Radio(f.value.first().cloned()),
+                K::PushButton | K::Signature => evopdf_xfa::FieldData::None,
             };
-            pdfcraft_xfa::FieldDatum { obj: f.obj, name: f.name, data }
+            evopdf_xfa::FieldDatum { obj: f.obj, name: f.name, data }
         })
         .collect()
 }
@@ -3325,12 +3325,12 @@ fn xfa_field_data(doc: &pdfcraft_cos::Document) -> Vec<pdfcraft_xfa::FieldDatum>
 /// (and set to the one written).
 /// `tpl`: the form's parsed template when the document has one cached (else it is parsed).
 fn xfa_sync_datasets(
-    doc: &mut pdfcraft_cos::Document,
-    tpl: Option<&pdfcraft_xfa::model::Template>,
-    datasets: &mut Option<pdfcraft_cos::ObjRef>,
+    doc: &mut evopdf_cos::Document,
+    tpl: Option<&evopdf_xfa::model::Template>,
+    datasets: &mut Option<evopdf_cos::ObjRef>,
 ) -> Result<Vec<String>, String> {
     let data = xfa_field_data(doc);
-    let r = pdfcraft_xfa::write_datasets_with(doc, tpl, &data, *datasets).map_err(|e| e.to_string())?;
+    let r = evopdf_xfa::write_datasets_with(doc, tpl, &data, *datasets).map_err(|e| e.to_string())?;
     if r.stream.is_some() {
         *datasets = r.stream;
     }
@@ -3368,7 +3368,7 @@ fn decode_data_file(bytes: &[u8]) -> Option<Result<String, String>> {
         let quote = enc.chars().next()?;
         Some(enc.get(1..)?.split(quote).next()?.trim().to_ascii_lowercase())
     };
-    if let Some((text, _)) = pdfcraft_xfa::packets::decode(bytes) {
+    if let Some((text, _)) = evopdf_xfa::packets::decode(bytes) {
         match declared(&text).as_deref() {
             None | Some("utf-8" | "utf8" | "utf-16" | "utf-16le" | "utf-16be" | "us-ascii" | "ascii") => return Some(Ok(text)),
             Some("iso-8859-1" | "latin1" | "latin-1" | "windows-1252" | "cp1252") if !bytes.starts_with(&[0xEF, 0xBB, 0xBF]) => {
@@ -3389,27 +3389,27 @@ fn decode_data_file(bytes: &[u8]) -> Option<Result<String, String>> {
 
 /// Take the XFA out of `doc` and note what went with it: the packets, data no field showed,
 /// buttons that did nothing but run scripts, and fields whose value differs from the form's
-/// data (data PdfCraft could not read into them, now lost).
-fn strip_xfa(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx) -> Result<(), EditError> {
-    let fields = pdfcraft_forms::fields(doc);
+/// data (data EvoPdf could not read into them, now lost).
+fn strip_xfa(doc: &mut evopdf_cos::Document, cx: &mut EditCtx) -> Result<(), EditError> {
+    let fields = evopdf_forms::fields(doc);
     let data = xfa_field_data(doc);
-    let differ = pdfcraft_xfa::read_values(doc, &data)
+    let differ = evopdf_xfa::read_values(doc, &data)
         .into_iter()
         .filter(|(name, value)| {
             let Some(f) = fields.iter().find(|f| f.name == *name) else { return false };
             match value {
-                pdfcraft_xfa::FieldData::Text(t) => f.value.join("\n") != *t && !t.trim().is_empty(),
-                pdfcraft_xfa::FieldData::Check(on) => f.value.is_empty() == *on,
-                pdfcraft_xfa::FieldData::Radio(sel) => f.value.first() != sel.as_ref(),
-                pdfcraft_xfa::FieldData::None => false,
+                evopdf_xfa::FieldData::Text(t) => f.value.join("\n") != *t && !t.trim().is_empty(),
+                evopdf_xfa::FieldData::Check(on) => f.value.is_empty() == *on,
+                evopdf_xfa::FieldData::Radio(sel) => f.value.first() != sel.as_ref(),
+                evopdf_xfa::FieldData::None => false,
             }
         })
         .count();
-    let r = pdfcraft_xfa::strip(doc).map_err(|e| EditError::Write(e.to_string()))?;
+    let r = evopdf_xfa::strip(doc).map_err(|e| EditError::Write(e.to_string()))?;
     cx.xfa_removed.extend(r.notes());
     if differ > 0 {
         cx.xfa_removed.push(format!(
-            "{differ} field(s) held a value other than the form's XFA data (data PdfCraft could not read into them); the data's version is gone"
+            "{differ} field(s) held a value other than the form's XFA data (data EvoPdf could not read into them); the data's version is gone"
         ));
     }
     Ok(())
@@ -3420,7 +3420,7 @@ fn strip_xfa(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx) -> Result<(), E
 /// (flattened, or made static), or an undo put it back.
 fn sync_xfa_state(doc: &mut Document) {
     let Some(cos) = doc.editor.as_ref().map(|e| &e.cos) else { return };
-    match pdfcraft_xfa::existing_layout(cos) {
+    match evopdf_xfa::existing_layout(cos) {
         Some(report) => {
             if doc.xfa.is_none() {
                 // Back after an undo: the XFA's own warnings apply again, the strip's don't.
@@ -3470,19 +3470,19 @@ fn is_xfa_data_file(text: &str) -> bool {
 
 /// The content type a picture is saved under, from its bytes: the kinds a laid-out form shows.
 fn image_content_type(bytes: &[u8]) -> Option<&'static str> {
-    match pdfcraft_xfa::image::kind(bytes)? {
-        pdfcraft_xfa::image::Kind::Jpeg => Some("image/jpeg"),
-        pdfcraft_xfa::image::Kind::Png => Some("image/png"),
-        pdfcraft_xfa::image::Kind::Gif => Some("image/gif"),
-        pdfcraft_xfa::image::Kind::Bmp => Some("image/bmp"),
-        pdfcraft_xfa::image::Kind::Tiff => Some("image/tiff"),
+    match evopdf_xfa::image::kind(bytes)? {
+        evopdf_xfa::image::Kind::Jpeg => Some("image/jpeg"),
+        evopdf_xfa::image::Kind::Png => Some("image/png"),
+        evopdf_xfa::image::Kind::Gif => Some("image/gif"),
+        evopdf_xfa::image::Kind::Bmp => Some("image/bmp"),
+        evopdf_xfa::image::Kind::Tiff => Some("image/tiff"),
     }
 }
 
 /// After the XFA data changed outside the fields (an import, a picture): a laid-out form is
 /// laid out again from the data (then, when `calculate`, its calculations run), and the
 /// fields take the data's values.
-fn xfa_after_data_change(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx, calculate: bool) -> Result<(), EditError> {
+fn xfa_after_data_change(doc: &mut evopdf_cos::Document, cx: &mut EditCtx, calculate: bool) -> Result<(), EditError> {
     if let Some(tpl) = cx.xfa.clone() {
         let mut run = xfa::XfaRun { page_count: cx.pages, out: &mut cx.xfa_out, datasets: cx.xfa_datasets, ran_away: false };
         let r = guard(|| xfa::on_data_replaced(doc, &tpl, calculate, &mut run))
@@ -3501,12 +3501,12 @@ fn xfa_after_data_change(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx, cal
     // emptied, so the data replaced is the data shown.
     if cx.xfa.is_none() && calculate {
         let data = xfa_field_data(doc);
-        let present: std::collections::HashSet<String> = pdfcraft_xfa::read_values(doc, &data).into_iter().map(|(n, _)| n).collect();
-        for f in pdfcraft_forms::fields(doc) {
+        let present: std::collections::HashSet<String> = evopdf_xfa::read_values(doc, &data).into_iter().map(|(n, _)| n).collect();
+        for f in evopdf_forms::fields(doc) {
             if present.contains(&f.name) || f.value.is_empty() {
                 continue;
             }
-            use pdfcraft_forms::FieldKind as K;
+            use evopdf_forms::FieldKind as K;
             let empty = match f.kind {
                 K::Text => FieldValue::Text(String::new()),
                 K::CheckBox => FieldValue::Check(false),
@@ -3514,7 +3514,7 @@ fn xfa_after_data_change(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx, cal
                 K::Combo | K::List => FieldValue::Choice(Vec::new()),
                 K::PushButton | K::Signature => continue,
             };
-            if let Err(e) = pdfcraft_forms::set_value(doc, &f.name, &empty) {
+            if let Err(e) = evopdf_forms::set_value(doc, &f.name, &empty) {
                 cx.xfa_out.errors.push(format!("{}: not emptied by the import: {e}", f.name));
             }
         }
@@ -3524,31 +3524,31 @@ fn xfa_after_data_change(doc: &mut pdfcraft_cos::Document, cx: &mut EditCtx, cal
 
 /// Give the fields the values the XFA datasets hold (a form filled in another viewer). Returns
 /// the names of the fields that changed.
-fn xfa_values_from_datasets(doc: &mut pdfcraft_cos::Document) -> Result<Vec<String>, String> {
+fn xfa_values_from_datasets(doc: &mut evopdf_cos::Document) -> Result<Vec<String>, String> {
     let data = xfa_field_data(doc);
-    let fields = pdfcraft_forms::fields(doc);
+    let fields = evopdf_forms::fields(doc);
     let mut changed = Vec::new();
-    for (name, value) in pdfcraft_xfa::read_values(doc, &data) {
+    for (name, value) in evopdf_xfa::read_values(doc, &data) {
         let Some(f) = fields.iter().find(|f| f.name == name) else { continue };
         let new = match value {
-            pdfcraft_xfa::FieldData::Text(t) if matches!(f.kind, pdfcraft_forms::FieldKind::Combo | pdfcraft_forms::FieldKind::List) => {
+            evopdf_xfa::FieldData::Text(t) if matches!(f.kind, evopdf_forms::FieldKind::Combo | evopdf_forms::FieldKind::List) => {
                 // Saved values, one per line for a multi-select list; shown text stands for
                 // its saved value (an older viewer may have written it).
                 let saved = |v: &str| f.options.iter().find(|(e, s)| e == v || s == v).map_or(v.to_string(), |(e, _)| e.clone());
-                let picked: Vec<String> = if f.has(pdfcraft_forms::flags::MULTI_SELECT) {
+                let picked: Vec<String> = if f.has(evopdf_forms::flags::MULTI_SELECT) {
                     t.lines().map(str::trim).filter(|l| !l.is_empty()).map(saved).collect()
                 } else {
                     vec![saved(t.trim())]
                 };
                 (f.value != picked).then_some(FieldValue::Choice(picked))
             }
-            pdfcraft_xfa::FieldData::Text(t) => (f.value.join("\n") != t).then_some(FieldValue::Text(t)),
-            pdfcraft_xfa::FieldData::Check(on) => (f.value.is_empty() == on).then_some(FieldValue::Check(on)),
-            pdfcraft_xfa::FieldData::Radio(sel) => (f.value.first() != sel.as_ref()).then_some(FieldValue::Radio(sel)),
-            pdfcraft_xfa::FieldData::None => None,
+            evopdf_xfa::FieldData::Text(t) => (f.value.join("\n") != t).then_some(FieldValue::Text(t)),
+            evopdf_xfa::FieldData::Check(on) => (f.value.is_empty() == on).then_some(FieldValue::Check(on)),
+            evopdf_xfa::FieldData::Radio(sel) => (f.value.first() != sel.as_ref()).then_some(FieldValue::Radio(sel)),
+            evopdf_xfa::FieldData::None => None,
         };
         if let Some(v) = new
-            && pdfcraft_forms::set_value(doc, &name, &v).is_ok()
+            && evopdf_forms::set_value(doc, &name, &v).is_ok()
         {
             changed.push(name);
         }
@@ -3557,8 +3557,8 @@ fn xfa_values_from_datasets(doc: &mut pdfcraft_cos::Document) -> Result<Vec<Stri
 }
 
 /// Validate the signature fields of `cos` (written as `bytes`).
-fn signatures_of(cos: &pdfcraft_cos::Document, bytes: &[u8], trust: &TrustStore, cache: &pdfcraft_sign::DigestCache) -> Vec<SignatureInfo> {
-    pdfcraft_sign::pdf::list_cached(cos, bytes, trust, cache)
+fn signatures_of(cos: &evopdf_cos::Document, bytes: &[u8], trust: &TrustStore, cache: &evopdf_sign::DigestCache) -> Vec<SignatureInfo> {
+    evopdf_sign::pdf::list_cached(cos, bytes, trust, cache)
 }
 
 impl Session {
@@ -3614,7 +3614,7 @@ impl Session {
     /// A dynamic stamp's second line: "By Ada at 2:14 pm, Oct 02, 2026" (local time).
     pub fn stamp_by_line(&self, author: &str) -> String {
         let offset = self.local_offset();
-        let d = self.now().map(|t| pdfcraft_cos::pdf_date(t + offset)).unwrap_or_default();
+        let d = self.now().map(|t| evopdf_cos::pdf_date(t + offset)).unwrap_or_default();
         let num = |a: usize, b: usize| d.get(a..b).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
         let (y, mo, day, hh, mm) = (num(2, 6), num(6, 8), num(8, 10), num(10, 12), num(12, 14));
         const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -3625,7 +3625,7 @@ impl Session {
 
     pub fn today(&self) -> (i64, u32, u32) {
         let offset = self.local_offset();
-        self.now().map(|t| pdfcraft_cos::pdf_date(t + offset)).as_deref().and_then(parse_ymd).unwrap_or((1970, 1, 1))
+        self.now().map(|t| evopdf_cos::pdf_date(t + offset)).as_deref().and_then(parse_ymd).unwrap_or((1970, 1, 1))
     }
 
     /// Open a document from bytes. Rendering starts lazily when pages are requested.
@@ -3681,7 +3681,7 @@ impl Session {
         bytes: Arc<Vec<u8>>,
         password: Option<&str>,
     ) -> Result<PreparedDocument, OpenError> {
-        let cos = std::panic::catch_unwind(|| pdfcraft_cos::Document::open_with_password(bytes.clone(), password));
+        let cos = std::panic::catch_unwind(|| evopdf_cos::Document::open_with_password(bytes.clone(), password));
         // The renderer authenticates on its own. It cannot use the owner password of R2–R4
         // files, so give it the user password that owner authentication recovers.
         let (info, render_password) = match inspect(bytes.clone(), password) {
@@ -3699,16 +3699,16 @@ impl Session {
         // A dynamic XFA form is a shell around an XML template; lay the template out into real
         // pages and fields so the rest of the engine works on it. The original bytes stay: the
         // laid-out form is one appended revision.
-        let opts = SaveOptions { mod_date: context.now.map(pdfcraft_cos::pdf_date), ..SaveOptions::default() };
+        let opts = SaveOptions { mod_date: context.now.map(evopdf_cos::pdf_date), ..SaveOptions::default() };
         // Write `work` as one more revision and reopen it: what the document then is.
-        let rebase = |work: &pdfcraft_cos::Document| -> Result<(Arc<Vec<u8>>, DocInfo, pdfcraft_cos::Document), String> {
+        let rebase = |work: &evopdf_cos::Document| -> Result<(Arc<Vec<u8>>, DocInfo, evopdf_cos::Document), String> {
             let new_bytes = write_incremental(work, &opts).map(Arc::new).map_err(|e| e.to_string())?;
             let new_info = inspect(new_bytes.clone(), render_password.as_deref()).map_err(|e| e.to_string())?;
-            let new_cos = pdfcraft_cos::Document::open_with_password(new_bytes.clone(), password).map_err(|e| e.to_string())?;
+            let new_cos = evopdf_cos::Document::open_with_password(new_bytes.clone(), password).map_err(|e| e.to_string())?;
             Ok((new_bytes, new_info, new_cos))
         };
         let (bytes, info, cos, xfa) = match (info.xfa, cos) {
-            (Some(pdfcraft_render::Xfa::Dynamic), Ok(Ok(cos))) if pdfcraft_xfa::existing_layout(&cos).is_none() => {
+            (Some(evopdf_render::Xfa::Dynamic), Ok(Ok(cos))) if evopdf_xfa::existing_layout(&cos).is_none() => {
                 let mut work = cos.clone();
                 let laid_out = guard(|| xfa_layout(&mut work))
                     .unwrap_or_else(|m| Err(format!("laying it out failed unexpectedly ({m})")))
@@ -3725,7 +3725,7 @@ impl Session {
             // A static XFA form, or a dynamic one laid out earlier: its datasets may hold values
             // filled in by another viewer since; give the fields those values.
             (Some(_), Ok(Ok(cos))) => {
-                let report = pdfcraft_xfa::existing_layout(&cos);
+                let report = evopdf_xfa::existing_layout(&cos);
                 let mut work = cos.clone();
                 let synced =
                     guard(|| xfa_values_from_datasets(&mut work)).unwrap_or_else(|m| Err(format!("reading its data failed unexpectedly ({m})")));
@@ -3814,10 +3814,10 @@ impl Session {
         // (#1656). Kept only when the reader then shows the same pages, and never on a signed
         // document, where writing the repair could rewrite the file under its signatures.
         let (bytes, info, cos) = match cos {
-            Ok(Ok(cos)) if !info.pages.is_empty() && pdfcraft_organize::page_count(&cos).unwrap_or(0) == 0 => {
+            Ok(Ok(cos)) if !info.pages.is_empty() && evopdf_organize::page_count(&cos).unwrap_or(0) == 0 => {
                 let mut work = cos.clone();
-                let signed = || pdfcraft_sign::pdf::list(&cos, &bytes, &context.trust).iter().any(|s| s.signed);
-                let rebuilt = match pdfcraft_organize::recover_page_tree(&mut work) {
+                let signed = || evopdf_sign::pdf::list(&cos, &bytes, &context.trust).iter().any(|s| s.signed);
+                let rebuilt = match evopdf_organize::recover_page_tree(&mut work) {
                     Ok(n) if n > 0 && !signed() => rebase(&work).ok().filter(|(_, i, _)| same_pages(&i.pages, &info.pages)),
                     _ => None,
                 };
@@ -3856,7 +3856,7 @@ impl Session {
         path: Option<String>,
         bytes: Arc<Vec<u8>>,
         mut info: DocInfo,
-        cos: Result<Result<pdfcraft_cos::Document, pdfcraft_cos::CosError>, Box<dyn std::any::Any + Send>>,
+        cos: Result<Result<evopdf_cos::Document, evopdf_cos::CosError>, Box<dyn std::any::Any + Send>>,
         render_password: Option<String>,
         password: Option<&str>,
         xfa: Option<XfaLayout>,
@@ -3876,7 +3876,7 @@ impl Session {
                         redo: Vec::new(),
                         keys,
                         appearances: AppearanceCache::default(),
-                        field_appearances: pdfcraft_forms::FieldAppearanceCache::default(),
+                        field_appearances: evopdf_forms::FieldAppearanceCache::default(),
                         text_blocks: TextBlocksCache::default(),
                     }),
                     None,
@@ -3885,7 +3885,7 @@ impl Session {
             Ok(Err(e)) => (None, Some(e.to_string())),
             Err(_) => (None, Some("the document structure could not be read for editing".into())),
         };
-        let sig_cache = Arc::new(pdfcraft_sign::DigestCache::default());
+        let sig_cache = Arc::new(evopdf_sign::DigestCache::default());
         let signatures = editor.as_ref().map(|e| signatures_of(&e.cos, &bytes, trust, &sig_cache)).unwrap_or_default();
         // The inspection reads only `/Info`; a file stating its title or author only in XMP still
         // shows them (#2373).
@@ -3901,7 +3901,7 @@ impl Session {
         let (form, adopted) = editor
             .as_ref()
             .map(|e| {
-                let mut fields = pdfcraft_forms::fields_with_adopted(&e.cos);
+                let mut fields = evopdf_forms::fields_with_adopted(&e.cos);
                 xfa::mark_script_buttons(&e.cos, &mut fields.items);
                 (fields.items, fields.adopted_page_fields)
             })
@@ -3992,7 +3992,7 @@ impl Session {
             other => other,
         };
         // Nothing to bake: leave undo history and the dirty flag alone.
-        if matches!(&edit, Edit::FlattenFillSign) && !pdfcraft_annot::has_visible_fill_sign(&editor.cos) {
+        if matches!(&edit, Edit::FlattenFillSign) && !evopdf_annot::has_visible_fill_sign(&editor.cos) {
             return Ok(());
         }
         let mut next = editor.cos.clone();
@@ -4007,8 +4007,8 @@ impl Session {
         // Redaction removed what its own interpreter places under the marks. The marks were drawn
         // over the page as the renderer shows it, so the renderer has the last word.
         if let Edit::ApplyRedactions { pages } = &edit {
-            let marks: Vec<pdfcraft_redact::Mark> =
-                pdfcraft_redact::marks(&editor.cos).into_iter().filter(|m| pages.as_ref().is_none_or(|p| p.contains(&m.page))).collect();
+            let marks: Vec<evopdf_redact::Mark> =
+                evopdf_redact::marks(&editor.cos).into_iter().filter(|m| pages.as_ref().is_none_or(|p| p.contains(&m.page))).collect();
             guard(|| shown_under_redactions(&next, &marks, &cx.redaction_overlays, &doc.info.pages, doc.password.as_deref()))
                 .unwrap_or_else(|m| Err(EditError::Invalid(format!("{} failed unexpectedly ({m}); the document was not changed", edit.label()))))?;
         }
@@ -4098,7 +4098,7 @@ impl Session {
         // Signed documents are only ever saved incrementally: an edit that needs a full rewrite
         // (applying redactions, changing security, sanitizing) would invalidate the signatures.
         // So does any edit to a file rebuilt from object headers: it has no chain to append to.
-        let rewrites = |c: &pdfcraft_cos::Document| c.full_save_required() || c.encryption_changed();
+        let rewrites = |c: &evopdf_cos::Document| c.full_save_required() || c.encryption_changed();
         if signed && ((rewrites(&next) && !rewrites(&editor.cos)) || (next.is_modified() && next.revisions().is_empty())) {
             return Err(EditError::SignedRewrite(edit.label().to_string()));
         }
@@ -4264,7 +4264,7 @@ impl Session {
             for (field, value) in info_fields(&mut doc.info, &editor.cos) {
                 *field = value;
             }
-            doc.info.custom = pdfcraft_organize::custom_info(&editor.cos);
+            doc.info.custom = evopdf_organize::custom_info(&editor.cos);
             doc.info.file_size = bytes.len();
             #[cfg(test)]
             check_refresh_panic();
@@ -4275,7 +4275,7 @@ impl Session {
             doc.bytes = bytes;
             return Ok(());
         }
-        let mut form = pdfcraft_forms::fields(&editor.cos);
+        let mut form = evopdf_forms::fields(&editor.cos);
         xfa::mark_script_buttons(&editor.cos, &mut form);
         let form = Arc::new(form);
         match scope {
@@ -4296,7 +4296,7 @@ impl Session {
                 for f in &mut doc.info.fields {
                     if let Some(ff) = by_name.get(f.name.as_str()) {
                         f.value = match ff.kind {
-                            pdfcraft_forms::FieldKind::CheckBox | pdfcraft_forms::FieldKind::Radio => {
+                            evopdf_forms::FieldKind::CheckBox | evopdf_forms::FieldKind::Radio => {
                                 Some(ff.value.first().cloned().unwrap_or_else(|| "Off".into()))
                             }
                             _ if ff.value.is_empty() => None,
@@ -4364,7 +4364,7 @@ impl Session {
             editor.cos.bytes().clone()
         };
         // The edit must still leave a file the viewer can open; anything else rolls back above.
-        pdfcraft_render::check_pages(bytes.clone(), doc.password.as_deref(), doc.info.pages.len()).map_err(|e| EditError::Reopen(e.to_string()))?;
+        evopdf_render::check_pages(bytes.clone(), doc.password.as_deref(), doc.info.pages.len()).map_err(|e| EditError::Reopen(e.to_string()))?;
         let (touches_added, touches_marks) = Self::content_refresh_lists(edit);
         if touches_added || touches_marks {
             doc.marker_scan = OnceLock::new();
@@ -4445,7 +4445,7 @@ impl Session {
         }
         doc.info = info;
         doc.fonts_stale = false;
-        let mut form = pdfcraft_forms::fields(&editor.cos);
+        let mut form = evopdf_forms::fields(&editor.cos);
         xfa::mark_script_buttons(&editor.cos, &mut form);
         doc.form = Arc::new(form);
         if invalidate_markers {
@@ -4481,10 +4481,10 @@ impl Session {
 
     /// [`Self::save_bytes`]'s writing of `cos`: the editor's graph, or (Evora, EVORA-COL-63) a copy
     /// of it with the member's typing applied (`Session::save_bytes_with`).
-    fn write_save(&self, editor: &Editor, cos: &pdfcraft_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
+    fn write_save(&self, editor: &Editor, cos: &evopdf_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
         let on_saved = Arc::ptr_eq(cos.bytes(), &editor.saved);
         // What the user removed again before saving (a cleared redaction mark) stays out of the file.
-        let opts = SaveOptions { mod_date: self.now().map(pdfcraft_cos::pdf_date), drop_unlinked: true, ..SaveOptions::default() };
+        let opts = SaveOptions { mod_date: self.now().map(evopdf_cos::pdf_date), drop_unlinked: true, ..SaveOptions::default() };
         // A restored snapshot can be based on an earlier revision. Append to the last saved
         // file so that revision stays in the chain. A full rewrite (redaction, new encryption,
         // a reconstructed file) still writes the current graph on its own.
@@ -4494,7 +4494,7 @@ impl Session {
             if on_saved || rewrite {
                 write_incremental(&cos, &opts)
             } else {
-                let mut base = pdfcraft_cos::Document::open_with_password(editor.saved.clone(), editor.saved_keys.reopen.as_deref())?;
+                let mut base = evopdf_cos::Document::open_with_password(editor.saved.clone(), editor.saved_keys.reopen.as_deref())?;
                 base.overlay_changes_from(&cos)?;
                 write_incremental(&base, &opts)
             }
@@ -4511,7 +4511,7 @@ impl Session {
             return Err(EditError::Signed);
         }
         let editor = doc.editor.as_ref().ok_or_else(|| EditError::ReadOnly(doc.read_only_reason.clone().unwrap_or_default()))?;
-        let opts = SaveOptions { mod_date: self.now().map(pdfcraft_cos::pdf_date), ..SaveOptions::default() };
+        let opts = SaveOptions { mod_date: self.now().map(evopdf_cos::pdf_date), ..SaveOptions::default() };
         let cos = writable(&editor.cos)?;
         guard(|| write_full(&cos, &opts)).map_err(EditError::Write)?.map(Arc::new).map_err(|e| EditError::Write(e.to_string()))
     }
@@ -4522,8 +4522,8 @@ impl Session {
     pub fn check_save(&self, id: DocId, bytes: &Arc<Vec<u8>>) -> Result<(), EditError> {
         let doc = self.get(id).ok_or(EditError::NoDocument)?;
         let Some(editor) = doc.editor.as_ref() else { return Ok(()) };
-        pdfcraft_cos::Document::open_with_password(bytes.clone(), editor.keys.reopen.as_deref()).map_err(|e| EditError::Reopen(e.to_string()))?;
-        pdfcraft_render::check_pages(bytes.clone(), doc.password.as_deref(), doc.info.pages.len()).map_err(|e| EditError::Reopen(e.to_string()))
+        evopdf_cos::Document::open_with_password(bytes.clone(), editor.keys.reopen.as_deref()).map_err(|e| EditError::Reopen(e.to_string()))?;
+        evopdf_render::check_pages(bytes.clone(), doc.password.as_deref(), doc.info.pages.len()).map_err(|e| EditError::Reopen(e.to_string()))
     }
 
     /// Record a successful save of `bytes` (to `path`, if any): rebase editing on the saved file
@@ -4535,10 +4535,10 @@ impl Session {
             // password when known, so saving never downgrades this session's rights).
             let keys = editor.keys.clone();
             // The saved file carries no Password-field values (#3943, #3944); the open document keeps them.
-            let typed = pdfcraft_forms::password_values(&editor.cos);
+            let typed = evopdf_forms::password_values(&editor.cos);
             editor.cos =
-                pdfcraft_cos::Document::open_with_password(bytes.clone(), keys.reopen.as_deref()).map_err(|e| EditError::Reopen(e.to_string()))?;
-            pdfcraft_forms::restore_password_values(&mut editor.cos, &typed).map_err(|e| EditError::Reopen(e.to_string()))?;
+                evopdf_cos::Document::open_with_password(bytes.clone(), keys.reopen.as_deref()).map_err(|e| EditError::Reopen(e.to_string()))?;
+            evopdf_forms::restore_password_values(&mut editor.cos, &typed).map_err(|e| EditError::Reopen(e.to_string()))?;
             if !typed.is_empty() && doc.info.xfa.is_some() {
                 let mut datasets = None;
                 let _ = xfa_sync_datasets(&mut editor.cos, doc.xfa_template.as_deref(), &mut datasets);
@@ -4568,12 +4568,12 @@ impl Session {
             return Ok(());
         }
         editor.cos.unlock(password).map_err(|e| match e {
-            pdfcraft_cos::CosError::WrongPassword => EditError::WrongPassword,
+            evopdf_cos::CosError::WrongPassword => EditError::WrongPassword,
             other => EditError::Protection(other.to_string()),
         })?;
         // Saving a state that keeps the security it was opened with reopens it with the same
         // passwords, so it reopens as owner.
-        let reopen_as_owner = |cos: &pdfcraft_cos::Document, keys: &mut Keys| {
+        let reopen_as_owner = |cos: &evopdf_cos::Document, keys: &mut Keys| {
             if !cos.encryption_changed() {
                 keys.reopen = Some(password.to_owned());
             }
@@ -4602,7 +4602,7 @@ impl Session {
         candidates.push(Keys::default());
         let (cos, keys) = candidates
             .into_iter()
-            .find_map(|k| pdfcraft_cos::Document::open_with_password(base.clone(), k.reopen.as_deref()).ok().map(|c| (c, k)))
+            .find_map(|k| evopdf_cos::Document::open_with_password(base.clone(), k.reopen.as_deref()).ok().map(|c| (c, k)))
             .ok_or_else(|| EditError::Reopen("the saved file can't be opened".into()))?;
         editor.cos = cos;
         editor.keys = keys;
@@ -4648,35 +4648,35 @@ impl Session {
 
     /// The page count of another PDF (Replace Pages, Insert Pages dialogs).
     pub fn page_count_of(&self, name: &str, bytes: &Arc<Vec<u8>>) -> Result<usize, EditError> {
-        Ok(pdfcraft_organize::page_count(&open_source(name, bytes)?)?)
+        Ok(evopdf_organize::page_count(&open_source(name, bytes)?)?)
     }
 
     /// A new blank document (Create ▸ Blank page).
     pub fn create_blank(&self, width: f64, height: f64, pages: usize) -> Result<Arc<Vec<u8>>, EditError> {
-        self.write_new(&pdfcraft_create::blank(width, height, pages)?)
+        self.write_new(&evopdf_create::blank(width, height, pages)?)
     }
 
     /// A new document with one page per image (PNG, JPEG).
     pub fn create_from_images(&self, images: &[(String, Vec<u8>)]) -> Result<Arc<Vec<u8>>, EditError> {
-        self.write_new(&pdfcraft_create::from_images(images)?)
+        self.write_new(&evopdf_create::from_images(images)?)
     }
 
     /// Create image pages at embedded resolution or a fixed dpi, without resampling.
     pub fn create_from_images_with_resolution(&self, images: &[(String, Vec<u8>)], resolution: ImageResolution) -> Result<Arc<Vec<u8>>, EditError> {
-        self.write_new(&pdfcraft_create::from_images_with_resolution(images, resolution)?)
+        self.write_new(&evopdf_create::from_images_with_resolution(images, resolution)?)
     }
 
     /// A new document from plain text (US Letter, 11 pt Helvetica). Text Helvetica can't draw is
     /// refused, naming the line and the character (never set as `?`).
     pub fn create_from_text(&self, title: &str, text: &str) -> Result<Arc<Vec<u8>>, EditError> {
-        self.write_new(&pdfcraft_create::from_text(title, text, pdfcraft_create::LETTER, 11.0)?)
+        self.write_new(&evopdf_create::from_text(title, text, evopdf_create::LETTER, 11.0)?)
     }
 
-    /// [`Self::create_from_text`] for a report PdfCraft writes from documents (comment summaries,
+    /// [`Self::create_from_text`] for a report EvoPdf writes from documents (comment summaries,
     /// compare reports), which can quote any language: characters Helvetica can't draw are written
     /// as `[U+XXXX]`, and the report's first line says so, rather than the report being refused.
     fn create_report(&self, title: &str, text: &str) -> Result<Arc<Vec<u8>>, EditError> {
-        let (doc, _escaped) = pdfcraft_create::from_text_escaped(title, text, pdfcraft_create::LETTER, 11.0)?;
+        let (doc, _escaped) = evopdf_create::from_text_escaped(title, text, evopdf_create::LETTER, 11.0)?;
         self.write_new(&doc)
     }
 
@@ -4733,7 +4733,7 @@ impl Session {
         let cos = match doc.editor.as_ref() {
             Some(e) => e.cos.clone(),
             None => {
-                pdfcraft_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()).map_err(|e| EditError::Write(e.to_string()))?
+                evopdf_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()).map_err(|e| EditError::Write(e.to_string()))?
             }
         };
         // An XFA form's data is its datasets, as Acrobat exports it: XML or an XDP.
@@ -4742,18 +4742,18 @@ impl Session {
             return Err(EditError::Invalid("XDP holds XFA form data; this document is not an XFA form (use .xml, .csv or .txt)".into()));
         }
         guard(|| match format {
-            DataFormat::Xfdf => Ok(pdfcraft_xfdf::export_xfdf(&cos, comments, fields, &doc.name).into_bytes()),
-            DataFormat::Fdf => pdfcraft_xfdf::export_fdf(&cos, comments, fields, &doc.name).map_err(|e| e.to_string()),
+            DataFormat::Xfdf => Ok(evopdf_xfdf::export_xfdf(&cos, comments, fields, &doc.name).into_bytes()),
+            DataFormat::Fdf => evopdf_xfdf::export_fdf(&cos, comments, fields, &doc.name).map_err(|e| e.to_string()),
             DataFormat::Xml | DataFormat::Xdp if xfa => {
-                pdfcraft_xfa::export_data(&cos, format == DataFormat::Xdp, &doc.name).map(String::into_bytes).map_err(|e| e.to_string())
+                evopdf_xfa::export_data(&cos, format == DataFormat::Xdp, &doc.name).map(String::into_bytes).map_err(|e| e.to_string())
             }
-            other => Ok(pdfcraft_xfdf::export_data(&cos, other).into_bytes()),
+            other => Ok(evopdf_xfdf::export_data(&cos, other).into_bytes()),
         })
         .map_err(EditError::Write)?
         .map_err(EditError::Write)
     }
 
-    /// The print-ready PDF for `settings` (sheets laid out for the paper; see `pdfcraft-print`).
+    /// The print-ready PDF for `settings` (sheets laid out for the paper; see `evopdf-print`).
     pub fn print_pdf(&self, id: DocId, settings: &print::Settings) -> Result<Vec<u8>, EditError> {
         let doc = self.get(id).ok_or(EditError::NoDocument)?;
         if !doc.allows_printing() {
@@ -4775,19 +4775,19 @@ impl Session {
                 }
             }
             let bytes = print_raster::rasterize(doc, &distinct, raster, settings.content).map_err(EditError::Print)?;
-            let pictures = pdfcraft_cos::Document::open(Arc::new(bytes)).map_err(|e| EditError::Print(e.to_string()))?;
+            let pictures = evopdf_cos::Document::open(Arc::new(bytes)).map_err(|e| EditError::Print(e.to_string()))?;
             let remapped = print::Settings {
                 pages: settings.pages.iter().map(|p| distinct.iter().position(|d| d == p).unwrap_or(0)).collect(),
                 content: print::Content::Document,
                 raster: None,
                 ..settings.clone()
             };
-            return pdfcraft_print::impose(&pictures, &remapped).map_err(|e| EditError::Print(e.to_string()));
+            return evopdf_print::impose(&pictures, &remapped).map_err(|e| EditError::Print(e.to_string()));
         }
         let mut cos = match doc.editor.as_ref() {
             Some(e) => e.cos.clone(),
             None => {
-                pdfcraft_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()).map_err(|e| EditError::Write(e.to_string()))?
+                evopdf_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()).map_err(|e| EditError::Write(e.to_string()))?
             }
         };
         // #3046: the layers print as they are shown. Once the Layers panel (or a set-layer
@@ -4796,28 +4796,28 @@ impl Session {
         if !doc.config.layers.is_empty() {
             set_default_layer_state(&mut cos, &doc.info.layers);
         }
-        pdfcraft_print::impose(&cos, settings).map_err(|e| EditError::Print(e.to_string()))
+        evopdf_print::impose(&cos, settings).map_err(|e| EditError::Print(e.to_string()))
     }
 
-    /// For each page, whether its text mostly runs bottom-to-top ([`pdfcraft_print::text_reads_up`]);
+    /// For each page, whether its text mostly runs bottom-to-top ([`evopdf_print::text_reads_up`]);
     /// only `pages` are read, the others are `false`.
     pub fn print_text_up(&self, id: DocId, pages: &[usize]) -> Vec<bool> {
         let Some(doc) = self.get(id) else { return Vec::new() };
         let cos = match doc.editor.as_ref() {
             Some(e) => e.cos.clone(),
-            None => match pdfcraft_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()) {
+            None => match evopdf_cos::Document::open_with_password(doc.bytes.clone(), doc.password.as_deref()) {
                 Ok(c) => c,
                 Err(_) => return Vec::new(),
             },
         };
-        (0..doc.info.pages.len()).map(|i| pages.contains(&i) && pdfcraft_print::text_reads_up(&cos, i)).collect()
+        (0..doc.info.pages.len()).map(|i| pages.contains(&i) && evopdf_print::text_reads_up(&cos, i)).collect()
     }
 
     /// Combine whole files, in order, into new PDF bytes (one bookmark per file).
     pub fn combine(&self, sources: &[(String, Arc<Vec<u8>>)]) -> Result<Arc<Vec<u8>>, EditError> {
         let docs = sources.iter().map(|(n, b)| open_source(n, b)).collect::<Result<Vec<_>, _>>()?;
-        let named: Vec<(&str, &pdfcraft_cos::Document)> = sources.iter().map(|(n, _)| n.as_str()).zip(docs.iter()).collect();
-        let out = pdfcraft_organize::combine(&named)?;
+        let named: Vec<(&str, &evopdf_cos::Document)> = sources.iter().map(|(n, _)| n.as_str()).zip(docs.iter()).collect();
+        let out = evopdf_organize::combine(&named)?;
         self.write_new(&out)
     }
 
@@ -4838,7 +4838,7 @@ impl Session {
         I: IntoIterator<Item = Result<CombineSource, E>>,
         E: From<EditError>,
     {
-        let mut combiner = pdfcraft_organize::Combiner::new();
+        let mut combiner = evopdf_organize::Combiner::new();
         let mut added = false;
         for source in sources {
             let (title, bytes, range) = source?;
@@ -4846,8 +4846,8 @@ impl Session {
             let range = range.as_deref().map(str::trim).filter(|r| !r.is_empty());
             let pages = match range {
                 Some(r) => {
-                    let n = pdfcraft_organize::page_count(&doc).map_err(EditError::from)?;
-                    let p = pdfcraft_print::select_pages(n, Some(r), &[], pdfcraft_print::Subset::All, false)
+                    let n = evopdf_organize::page_count(&doc).map_err(EditError::from)?;
+                    let p = evopdf_print::select_pages(n, Some(r), &[], evopdf_print::Subset::All, false)
                         .map_err(|e| EditError::Print(format!("{title}: {e}")))?;
                     Some(p)
                 }
@@ -4866,17 +4866,17 @@ impl Session {
     /// [`Self::combine_ranges`] with the password each encrypted source is opened with, by
     /// position (missing or `None`: no password). The result is not encrypted.
     pub fn combine_unlocked(&self, sources: &[CombineSource], passwords: &[Option<&str>]) -> Result<Arc<Vec<u8>>, EditError> {
-        Ok(self.combine_unlocked_reporting(sources, passwords, pdfcraft_organize::FieldConflicts::Rename)?.bytes)
+        Ok(self.combine_unlocked_reporting(sources, passwords, evopdf_organize::FieldConflicts::Rename)?.bytes)
     }
 
     /// The pre-flight over byte sources: what combining them, in order, would rename in each one
     /// (whole files; page ranges are the combine's to apply). A source that cannot be opened
     /// previews as nothing — its row already says why it cannot be combined.
     pub fn combine_field_conflicts(&self, sources: &[CombineSource], passwords: &[Option<&str>]) -> Vec<Vec<(String, String)>> {
-        let docs: Vec<Option<pdfcraft_cos::Document>> =
+        let docs: Vec<Option<evopdf_cos::Document>> =
             sources.iter().enumerate().map(|(i, (n, b, _))| open_source_with(n, b, passwords.get(i).copied().flatten()).ok()).collect();
-        let refs: Vec<&pdfcraft_cos::Document> = docs.iter().filter_map(Option::as_ref).collect();
-        let mut opened = pdfcraft_organize::combine_field_conflicts(&refs).into_iter();
+        let refs: Vec<&evopdf_cos::Document> = docs.iter().filter_map(Option::as_ref).collect();
+        let mut opened = evopdf_organize::combine_field_conflicts(&refs).into_iter();
         // One preview per source, in step with it: a file that cannot be opened has none.
         docs.iter().map(|d| if d.is_some() { opened.next().unwrap_or_default() } else { Default::default() }).collect()
     }
@@ -4886,7 +4886,7 @@ impl Session {
         &self,
         sources: &[CombineSource],
         passwords: &[Option<&str>],
-        field_conflicts: pdfcraft_organize::FieldConflicts,
+        field_conflicts: evopdf_organize::FieldConflicts,
     ) -> Result<Combined, EditError> {
         let docs = sources
             .iter()
@@ -4898,17 +4898,17 @@ impl Session {
             let range = range.as_deref().map(str::trim).filter(|r| !r.is_empty());
             pages.push(match range {
                 Some(r) => {
-                    let n = pdfcraft_organize::page_count(d)?;
-                    let p = pdfcraft_print::select_pages(n, Some(r), &[], pdfcraft_print::Subset::All, false)
+                    let n = evopdf_organize::page_count(d)?;
+                    let p = evopdf_print::select_pages(n, Some(r), &[], evopdf_print::Subset::All, false)
                         .map_err(|e| EditError::Print(format!("{name}: {e}")))?;
                     Some(p)
                 }
                 None => None,
             });
         }
-        let named: Vec<(&str, &pdfcraft_cos::Document, Option<&[usize]>)> =
+        let named: Vec<(&str, &evopdf_cos::Document, Option<&[usize]>)> =
             sources.iter().zip(docs.iter()).zip(&pages).map(|(((n, _, _), d), p)| (n.as_str(), d, p.as_deref())).collect();
-        let out = pdfcraft_organize::combine_selected_with(&named, field_conflicts)?;
+        let out = evopdf_organize::combine_selected_with(&named, field_conflicts)?;
         let bytes = self.write_new(&out.doc)?;
         Ok(Combined { bytes, renamed_fields: out.renamed_fields })
     }
@@ -4916,10 +4916,10 @@ impl Session {
     /// [`Self::combine_unlocked`] where sources with the same `groups` key (by position) are one
     /// file split into several runs placed apart: each file is opened and copied once, so it keeps
     /// one bookmark, its links between its own pages, its fields and its attachments whole (see
-    /// `pdfcraft_organize::combine_grouped`). A group's later sources use its first source's bytes
+    /// `evopdf_organize::combine_grouped`). A group's later sources use its first source's bytes
     /// and password; a source without a key is a file of its own.
     pub fn combine_grouped(&self, sources: &[CombineSource], groups: &[u64], passwords: &[Option<&str>]) -> Result<Arc<Vec<u8>>, EditError> {
-        Ok(self.combine_grouped_reporting(sources, groups, passwords, pdfcraft_organize::FieldConflicts::Rename)?.bytes)
+        Ok(self.combine_grouped_reporting(sources, groups, passwords, evopdf_organize::FieldConflicts::Rename)?.bytes)
     }
 
     /// [`Self::combine_grouped`] reporting what the conflict resolution renamed.
@@ -4928,9 +4928,9 @@ impl Session {
         sources: &[CombineSource],
         groups: &[u64],
         passwords: &[Option<&str>],
-        field_conflicts: pdfcraft_organize::FieldConflicts,
+        field_conflicts: evopdf_organize::FieldConflicts,
     ) -> Result<Combined, EditError> {
-        let (mut keys, mut docs, mut file): (Vec<Option<u64>>, Vec<pdfcraft_cos::Document>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
+        let (mut keys, mut docs, mut file): (Vec<Option<u64>>, Vec<evopdf_cos::Document>, Vec<usize>) = (Vec::new(), Vec::new(), Vec::new());
         for (i, (name, bytes, _)) in sources.iter().enumerate() {
             let key = groups.get(i).copied();
             let known = key.and_then(|k| keys.iter().position(|g| *g == Some(k)));
@@ -4950,20 +4950,20 @@ impl Session {
             let Some(d) = docs.get(*at) else { return Err(EditError::Write(format!("{name}: not opened"))) };
             pages.push(match range {
                 Some(r) => {
-                    let n = pdfcraft_organize::page_count(d)?;
-                    let p = pdfcraft_print::select_pages(n, Some(r), &[], pdfcraft_print::Subset::All, false)
+                    let n = evopdf_organize::page_count(d)?;
+                    let p = evopdf_print::select_pages(n, Some(r), &[], evopdf_print::Subset::All, false)
                         .map_err(|e| EditError::Print(format!("{name}: {e}")))?;
                     Some(p)
                 }
                 None => None,
             });
         }
-        let mut runs: Vec<pdfcraft_organize::Run<'_>> = Vec::with_capacity(sources.len());
+        let mut runs: Vec<evopdf_organize::Run<'_>> = Vec::with_capacity(sources.len());
         for (((name, _, _), at), p) in sources.iter().zip(&file).zip(&pages) {
             let Some(d) = docs.get(*at) else { return Err(EditError::Write(format!("{name}: not opened"))) };
             runs.push((*at, name.as_str(), d, p.as_deref()));
         }
-        let out = pdfcraft_organize::combine_grouped_with(&runs, field_conflicts)?;
+        let out = evopdf_organize::combine_grouped_with(&runs, field_conflicts)?;
         let bytes = self.write_new(&out.doc)?;
         Ok(Combined { bytes, renamed_fields: out.renamed_fields })
     }
@@ -4974,21 +4974,21 @@ impl Session {
         if src.permissions().is_some_and(|p| !p.assemble()) {
             return Err(EditError::NotPermitted("extracting pages"));
         }
-        let out = pdfcraft_organize::extract_pages(src, pages)?;
+        let out = evopdf_organize::extract_pages(src, pages)?;
         self.write_new(&out)
     }
 
     /// Split the document into several new PDFs.
-    pub fn split(&self, id: DocId, by: &pdfcraft_organize::SplitBy) -> Result<Vec<SplitPart>, EditError> {
+    pub fn split(&self, id: DocId, by: &evopdf_organize::SplitBy) -> Result<Vec<SplitPart>, EditError> {
         let src = self.cos(id)?;
         if src.permissions().is_some_and(|p| !p.assemble()) {
             return Err(EditError::NotPermitted("splitting the document"));
         }
-        let n = pdfcraft_organize::page_count(src)?;
-        pdfcraft_organize::split_ranges(n, by)
+        let n = evopdf_organize::page_count(src)?;
+        evopdf_organize::split_ranges(n, by)
             .into_iter()
             .map(|r| {
-                let doc = pdfcraft_organize::extract_pages(src, &r.clone().collect::<Vec<_>>())?;
+                let doc = evopdf_organize::extract_pages(src, &r.clone().collect::<Vec<_>>())?;
                 Ok((r.start + 1, r.end, self.write_new(&doc)?))
             })
             .collect()
@@ -5002,18 +5002,18 @@ impl Session {
         if src.permissions().is_some_and(|p| !p.assemble()) {
             return Err(EditError::NotPermitted("splitting the document"));
         }
-        let n = pdfcraft_organize::page_count(src)?;
+        let n = evopdf_organize::page_count(src)?;
         let mut cuts = Vec::new();
         let mut used = 0usize;
         for p in 0..n {
-            let size = self.write_unchecked(&pdfcraft_organize::extract_pages(src, &[p])?)?.len();
+            let size = self.write_unchecked(&evopdf_organize::extract_pages(src, &[p])?)?.len();
             if used > 0 && used + size > max_bytes {
                 cuts.push(p);
                 used = 0;
             }
             used += size;
         }
-        self.split(id, &pdfcraft_organize::SplitBy::Before(cuts))
+        self.split(id, &evopdf_organize::SplitBy::Before(cuts))
     }
 
     /// Web addresses in the text of every page (Create links from URLs): (page, one rectangle
@@ -5021,14 +5021,14 @@ impl Session {
     pub fn find_urls(&self, id: DocId) -> Vec<(usize, Vec<[f64; 4]>, String)> {
         let Some(doc) = self.get(id) else { return Vec::new() };
         let config = RenderConfig { password: doc.password.as_deref().map(Arc::from), ..Default::default() };
-        let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), config);
+        let mut r = evopdf_render::PageRenderer::new(doc.bytes.clone(), config);
         let mut out = Vec::new();
         for page in 0..doc.info.pages.len() {
-            let res = r.render(pdfcraft_render::RenderRequest { page, kind: pdfcraft_render::RequestKind::Text, scale: 1.0, ..Default::default() });
+            let res = r.render(evopdf_render::RenderRequest { page, kind: evopdf_render::RequestKind::Text, scale: 1.0, ..Default::default() });
             let Some(text) = res.text else { continue };
             let found: std::cell::RefCell<Vec<(std::ops::Range<usize>, String)>> = Default::default();
             let hits = text.find_with(|chars| {
-                let urls = pdfcraft_annot::links::find_urls(chars);
+                let urls = evopdf_annot::links::find_urls(chars);
                 let ranges = urls.iter().map(|u| u.0.clone()).collect();
                 *found.borrow_mut() = urls;
                 ranges
@@ -5065,14 +5065,14 @@ impl Session {
     pub fn bookmark_page(&self, id: DocId, offset: usize, limit: usize) -> Option<BookmarkPage> {
         let doc = self.get(id)?;
         if let Some(editor) = doc.editor.as_ref() {
-            let page = pdfcraft_organize::bookmark_page(&editor.cos, offset, limit);
+            let page = evopdf_organize::bookmark_page(&editor.cos, offset, limit);
             let rows = page
                 .bookmarks
                 .into_iter()
                 .map(|b| {
                     let view = b.view.map_or_else(Default::default, |(kind, numbers)| {
                         let numbers: Vec<Option<f32>> = numbers.iter().map(|n| n.map(|n| n as f32)).collect();
-                        pdfcraft_render::DestView::from_operands(Some(&kind), &numbers)
+                        evopdf_render::DestView::from_operands(Some(&kind), &numbers)
                     });
                     BookmarkRow { path: b.path, title: b.title, open: b.open, page: b.page, view, color: b.color, italic: b.italic, bold: b.bold }
                 })
@@ -5089,7 +5089,7 @@ impl Session {
     pub fn bookmark_splits(&self, id: DocId) -> Vec<(usize, String)> {
         let Some(doc) = self.get(id) else { return Vec::new() };
         let top: Vec<(Option<usize>, String)> = match doc.editor.as_ref() {
-            Some(editor) => pdfcraft_organize::top_level_bookmarks(&editor.cos).into_iter().map(|b| (b.page, b.title)).collect(),
+            Some(editor) => evopdf_organize::top_level_bookmarks(&editor.cos).into_iter().map(|b| (b.page, b.title)).collect(),
             None => doc.info.outline.iter().map(|o| (o.page, o.title.clone())).collect(),
         };
         let mut out: Vec<(usize, String)> = top.into_iter().filter_map(|(page, title)| Some((page?, title))).collect();
@@ -5112,26 +5112,26 @@ impl Session {
         Ok(id)
     }
 
-    fn cos(&self, id: DocId) -> Result<&pdfcraft_cos::Document, EditError> {
+    fn cos(&self, id: DocId) -> Result<&evopdf_cos::Document, EditError> {
         let doc = self.get(id).ok_or(EditError::NoDocument)?;
         doc.editor.as_ref().map(|e| &e.cos).ok_or_else(|| EditError::ReadOnly(doc.read_only_reason.clone().unwrap_or_default()))
     }
 
     /// A new file (Combine, Extract, Split, Create) as bytes, checked like a save before anyone
     /// writes it (#1698, #2166): it reopens, and shows the pages it was built from.
-    fn write_new(&self, doc: &pdfcraft_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
+    fn write_new(&self, doc: &evopdf_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
         let bytes = self.write_unchecked(doc)?;
-        let expected = pdfcraft_organize::page_count(doc)?;
-        pdfcraft_cos::Document::open(bytes.clone()).map_err(|e| EditError::Reopen(e.to_string()))?;
-        pdfcraft_render::check_pages(bytes.clone(), None, expected).map_err(|e| EditError::Reopen(e.to_string()))?;
+        let expected = evopdf_organize::page_count(doc)?;
+        evopdf_cos::Document::open(bytes.clone()).map_err(|e| EditError::Reopen(e.to_string()))?;
+        evopdf_render::check_pages(bytes.clone(), None, expected).map_err(|e| EditError::Reopen(e.to_string()))?;
         Ok(bytes)
     }
 
     /// [`Self::write_new`] without the check, for bytes nobody writes: measuring a part's size.
     /// Like a save, a new file never carries a typed Password-field value (#3926): Extract and
     /// Split copy the fields of the pages they take.
-    fn write_unchecked(&self, doc: &pdfcraft_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
-        let opts = SaveOptions { mod_date: self.now().map(pdfcraft_cos::pdf_date), ..SaveOptions::default() };
+    fn write_unchecked(&self, doc: &evopdf_cos::Document) -> Result<Arc<Vec<u8>>, EditError> {
+        let opts = SaveOptions { mod_date: self.now().map(evopdf_cos::pdf_date), ..SaveOptions::default() };
         let doc = writable(doc)?;
         write_full(&doc, &opts).map(Arc::new).map_err(|e| EditError::Write(e.to_string()))
     }
@@ -5150,7 +5150,7 @@ impl Session {
                 // The working bytes hold typed Password-field values (#3926, #3944): a recovery file
                 // is written from a copy without them, and none is written if that copy fails.
                 let bytes =
-                    match d.editor.as_ref().filter(|e| pdfcraft_forms::has_password_values(&e.cos) || pdfcraft_xfa::has_password_values(&e.cos)) {
+                    match d.editor.as_ref().filter(|e| evopdf_forms::has_password_values(&e.cos) || evopdf_xfa::has_password_values(&e.cos)) {
                         Some(e) => match writable(&e.cos)
                             .and_then(|c| write_incremental(&c, &SaveOptions::default()).map_err(|e| EditError::Write(e.to_string())))
                         {
@@ -5275,14 +5275,14 @@ impl Session {
     }
 
     /// The certificates trusted for signing.
-    pub fn trusted_certificates(&self) -> &[pdfcraft_sign::Certificate] {
+    pub fn trusted_certificates(&self) -> &[evopdf_sign::Certificate] {
         &self.trust.certs
     }
 
     /// Replace the trusted certificates, revalidate every open document's signatures,
     /// and rebuild its display copy and renderer to match (working file untouched,
     /// generation/dirty unchanged: trust alone is not an edit).
-    pub fn set_trusted_certificates(&mut self, certs: Vec<pdfcraft_sign::Certificate>) {
+    pub fn set_trusted_certificates(&mut self, certs: Vec<evopdf_sign::Certificate>) {
         self.trust = Arc::new(TrustStore { certs });
         for doc in &mut self.docs {
             doc.trust = self.trust.clone();
@@ -5299,7 +5299,7 @@ impl Session {
     /// The signing time as a PDF date in local time with its offset (`D:…+02'00'`).
     pub fn signing_date(&self) -> String {
         let offset = self.local_offset();
-        let local = pdfcraft_cos::pdf_date(self.now().unwrap_or(0) + offset);
+        let local = evopdf_cos::pdf_date(self.now().unwrap_or(0) + offset);
         let stamp = local.trim_end_matches('Z');
         if offset == 0 {
             return format!("{stamp}Z");
@@ -5311,7 +5311,7 @@ impl Session {
     /// Sign the document's current state with `id` (Use a certificate ▸ Digitally sign). Returns
     /// the signed file; the caller saves it and then calls [`Session::mark_signed`]. An empty
     /// `opts.date` takes the session clock.
-    pub fn sign(&self, doc: DocId, id: &pdfcraft_sign::DigitalId, mut opts: SignOptions) -> Result<Arc<Vec<u8>>, EditError> {
+    pub fn sign(&self, doc: DocId, id: &evopdf_sign::DigitalId, mut opts: SignOptions) -> Result<Arc<Vec<u8>>, EditError> {
         let d = self.get(doc).ok_or(EditError::NoDocument)?;
         // Encrypted documents are signed under their permissions (the signer checks them).
         let editor = d.editor.as_ref().ok_or_else(|| EditError::ReadOnly(d.read_only_reason.clone().unwrap_or_default()))?;
@@ -5320,7 +5320,7 @@ impl Session {
         }
         // A typed Password-field value is not signed into the file (#3926), as it isn't saved.
         let cos = writable(&editor.cos)?;
-        Ok(Arc::new(pdfcraft_sign::sign(&cos, id, &opts)?))
+        Ok(Arc::new(evopdf_sign::sign(&cos, id, &opts)?))
     }
 
     /// [`Session::sign`], embedding an RFC 3161 signature timestamp (PAdES B-T) produced by
@@ -5328,9 +5328,9 @@ impl Session {
     pub fn sign_with_timestamp(
         &self,
         doc: DocId,
-        id: &pdfcraft_sign::DigitalId,
+        id: &evopdf_sign::DigitalId,
         mut opts: SignOptions,
-        tsa: &dyn pdfcraft_sign::TimestampAuthority,
+        tsa: &dyn evopdf_sign::TimestampAuthority,
     ) -> Result<Arc<Vec<u8>>, EditError> {
         let d = self.get(doc).ok_or(EditError::NoDocument)?;
         let editor = d.editor.as_ref().ok_or_else(|| EditError::ReadOnly(d.read_only_reason.clone().unwrap_or_default()))?;
@@ -5338,7 +5338,7 @@ impl Session {
             opts.date = self.signing_date();
         }
         let cos = writable(&editor.cos)?;
-        let signed = Arc::new(pdfcraft_sign::sign_with_timestamp(&cos, id, &opts, tsa)?);
+        let signed = Arc::new(evopdf_sign::sign_with_timestamp(&cos, id, &opts, tsa)?);
         // Checked like a save before anyone writes it (#2166).
         self.check_save(doc, &signed)?;
         Ok(signed)
@@ -5346,23 +5346,23 @@ impl Session {
 
     /// Append a standalone document timestamp (RFC 3161, `/ETSI.RFC3161`) covering the file's
     /// current state. An empty `date` takes the session clock; the transport is the caller's.
-    pub fn timestamp_document(&self, doc: DocId, tsa: &dyn pdfcraft_sign::TimestampAuthority, date: String) -> Result<Arc<Vec<u8>>, EditError> {
+    pub fn timestamp_document(&self, doc: DocId, tsa: &dyn evopdf_sign::TimestampAuthority, date: String) -> Result<Arc<Vec<u8>>, EditError> {
         let d = self.get(doc).ok_or(EditError::NoDocument)?;
         let editor = d.editor.as_ref().ok_or_else(|| EditError::ReadOnly(d.read_only_reason.clone().unwrap_or_default()))?;
         let date = if date.is_empty() { self.signing_date() } else { date };
         let cos = writable(&editor.cos)?;
-        let stamped = Arc::new(pdfcraft_sign::timestamp_document(&cos, tsa, &date)?);
+        let stamped = Arc::new(evopdf_sign::timestamp_document(&cos, tsa, &date)?);
         self.check_save(doc, &stamped)?;
         Ok(stamped)
     }
 
     /// Embed revocation evidence into the catalog's `/DSS` with `/VRI` entries per signature
     /// (PAdES B-LT): an incremental update that never rewrites signed bytes.
-    pub fn embed_ltv(&self, doc: DocId, evidence: &pdfcraft_sign::dss::Evidence) -> Result<Arc<Vec<u8>>, EditError> {
+    pub fn embed_ltv(&self, doc: DocId, evidence: &evopdf_sign::dss::Evidence) -> Result<Arc<Vec<u8>>, EditError> {
         let d = self.get(doc).ok_or(EditError::NoDocument)?;
         let editor = d.editor.as_ref().ok_or_else(|| EditError::ReadOnly(d.read_only_reason.clone().unwrap_or_default()))?;
         let cos = writable(&editor.cos)?;
-        let embedded = Arc::new(pdfcraft_sign::dss::embed(&cos, evidence)?);
+        let embedded = Arc::new(evopdf_sign::dss::embed(&cos, evidence)?);
         self.check_save(doc, &embedded)?;
         Ok(embedded)
     }
@@ -5391,7 +5391,7 @@ impl Session {
     /// have changed it (Document Properties ▸ Fonts, `doc_info`). A no-op otherwise.
     pub fn refresh_fonts(&mut self, id: DocId) {
         let Some(doc) = self.docs.iter_mut().find(|d| d.id == id && d.fonts_stale) else { return };
-        if let Ok(info) = pdfcraft_render::inspect(doc.bytes.clone(), doc.password.as_deref()) {
+        if let Ok(info) = evopdf_render::inspect(doc.bytes.clone(), doc.password.as_deref()) {
             doc.info.fonts = info.fonts;
         }
         doc.fonts_stale = false;
@@ -5413,11 +5413,11 @@ pub struct MarkFile {
 
 /// Embed an image that is placed on a page, turned the way its EXIF Orientation says.
 fn embed_image(
-    doc: &mut pdfcraft_cos::Document,
+    doc: &mut evopdf_cos::Document,
     name: &str,
     bytes: &[u8],
-) -> Result<(pdfcraft_cos::ObjRef, (f64, f64)), pdfcraft_create::CreateError> {
-    pdfcraft_create::image_xobject(doc, name, bytes)
+) -> Result<(evopdf_cos::ObjRef, (f64, f64)), evopdf_create::CreateError> {
+    evopdf_create::image_xobject(doc, name, bytes)
 }
 
 /// The largest box of `w`:`h` shape inside `rect`, centred in it: a stamp's picture keeps its
@@ -5444,15 +5444,15 @@ fn fit_picture(rect: [f64; 4], w: f64, h: f64) -> [f64; 4] {
 }
 
 /// Bring a mark's picture into `doc`: a PDF page as a form XObject, or an image.
-fn mark_source(doc: &mut pdfcraft_cos::Document, f: &MarkFile) -> Result<pdfcraft_edit::MarkSource, EditError> {
+fn mark_source(doc: &mut evopdf_cos::Document, f: &MarkFile) -> Result<evopdf_edit::MarkSource, EditError> {
     let head = &f.bytes[..f.bytes.len().min(1024)];
     if head.windows(5).any(|w| w == b"%PDF-") {
-        let src = pdfcraft_cos::Document::open(f.bytes.clone()).map_err(|e| EditError::Source(format!("{}: {e}", f.name)))?;
-        let (xobject, size) = pdfcraft_organize::page_as_form(doc, &src, f.page)?;
-        Ok(pdfcraft_edit::MarkSource { xobject, size, image: false })
+        let src = evopdf_cos::Document::open(f.bytes.clone()).map_err(|e| EditError::Source(format!("{}: {e}", f.name)))?;
+        let (xobject, size) = evopdf_organize::page_as_form(doc, &src, f.page)?;
+        Ok(evopdf_edit::MarkSource { xobject, size, image: false })
     } else {
         let (xobject, size) = embed_image(doc, &f.name, &f.bytes)?;
-        Ok(pdfcraft_edit::MarkSource { xobject, size, image: true })
+        Ok(evopdf_edit::MarkSource { xobject, size, image: true })
     }
 }
 
@@ -5516,7 +5516,7 @@ pub fn comment_type_name(subtype: &str) -> &str {
 }
 
 /// [`comment_type_name`], telling callouts, clouds and typewriter text apart by `/IT`.
-pub fn comment_kind(a: &pdfcraft_render::Annotation) -> &str {
+pub fn comment_kind(a: &evopdf_render::Annotation) -> &str {
     match a.intent.as_deref() {
         Some("FreeTextCallout") => "Callout",
         Some("PolygonCloud") => "Cloud",
@@ -5528,11 +5528,11 @@ pub fn comment_kind(a: &pdfcraft_render::Annotation) -> &str {
 /// The text of a comment summary: one block per comment (replies indented under it), with a
 /// "Page N" heading when sorted by page. Checkmarks and status replies are left out, as are
 /// pop-ups; the number is the comment's position on its page.
-pub fn comment_summary(name: &str, all: &[pdfcraft_render::Annotation], sort: SummarySort) -> String {
+pub fn comment_summary(name: &str, all: &[evopdf_render::Annotation], sort: SummarySort) -> String {
     use std::fmt::Write;
-    let top: Vec<&pdfcraft_render::Annotation> = all.iter().filter(|a| a.is_comment()).collect();
+    let top: Vec<&evopdf_render::Annotation> = all.iter().filter(|a| a.is_comment()).collect();
     // Each reply under the annotation its `/IRT` points at, in document order, gathered once.
-    type Children<'a> = std::collections::HashMap<(usize, usize), Vec<&'a pdfcraft_render::Annotation>>;
+    type Children<'a> = std::collections::HashMap<(usize, usize), Vec<&'a evopdf_render::Annotation>>;
     let mut children = Children::new();
     for r in all.iter().filter(|r| r.state.is_none()) {
         if let Some(parent) = r.parent {
@@ -5541,7 +5541,7 @@ pub fn comment_summary(name: &str, all: &[pdfcraft_render::Annotation], sort: Su
     }
     // Write a comment's replies, indenting each level. A reply to a reply keeps its `/IRT` on the
     // direct parent, so following one level would leave the deeper replies out of the summary.
-    fn write_replies(out: &mut String, children: &Children<'_>, parent: &pdfcraft_render::Annotation, depth: usize) {
+    fn write_replies(out: &mut String, children: &Children<'_>, parent: &evopdf_render::Annotation, depth: usize) {
         use std::fmt::Write;
         if depth > 64 {
             return;
@@ -5556,7 +5556,7 @@ pub fn comment_summary(name: &str, all: &[pdfcraft_render::Annotation], sort: Su
             write_replies(out, children, r, depth + 1);
         }
     }
-    let mut numbered: Vec<(usize, &pdfcraft_render::Annotation)> = Vec::new();
+    let mut numbered: Vec<(usize, &evopdf_render::Annotation)> = Vec::new();
     let mut last = usize::MAX;
     let mut n = 0;
     for a in &top {
@@ -5620,7 +5620,7 @@ pub enum PageOrientation {
 }
 
 /// The pages of `pages` (0-based) that pass the filters.
-pub fn filter_pages(info: &pdfcraft_render::DocInfo, pages: &[usize], parity: PageParity, orientation: PageOrientation) -> Vec<usize> {
+pub fn filter_pages(info: &evopdf_render::DocInfo, pages: &[usize], parity: PageParity, orientation: PageOrientation) -> Vec<usize> {
     pages
         .iter()
         .copied()

@@ -5,7 +5,7 @@
 
 use serde::Serialize;
 
-use crate::PdfCraftApp;
+use crate::EvoPdfApp;
 use crate::canvas::{self, ViewDefaults};
 
 /// How many files' views are remembered (the most recently closed or saved first).
@@ -38,7 +38,7 @@ fn absolute(path: &str) -> String {
     path.to_string()
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// How view `index` shows its document now; `None` for a document without a file. In full
     /// screen, the display it will go back to, at the page reached.
     fn view_to_remember(&self, index: usize) -> Option<LastView> {

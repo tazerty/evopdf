@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use pdfcraft_cos::{Dict, Document, Object, PdfString};
+use evopdf_cos::{Dict, Document, Object, PdfString};
 
 use crate::data::{DataNode, data_path, parse_datasets};
 use crate::model::{Access, Field, Node, Presence, Script, SomIndices, Template};
@@ -106,7 +106,7 @@ fn access_name(a: Access) -> &'static str {
     }
 }
 
-fn acroform(doc: &Document) -> Option<(Option<pdfcraft_cos::ObjRef>, Dict)> {
+fn acroform(doc: &Document) -> Option<(Option<evopdf_cos::ObjRef>, Dict)> {
     let root = doc.root()?;
     let catalog = doc.get(root);
     let o = catalog.as_dict()?.get(b"AcroForm")?.clone();
@@ -543,7 +543,7 @@ pub fn apply_overrides(tpl: &Template, ov: &Overrides) -> Template {
 
 /// The generated fields of the AcroForm by SOM path: `som → (field name, is a radio group)`.
 pub fn fields_by_som(doc: &Document) -> HashMap<String, String> {
-    fn walk(doc: &Document, r: pdfcraft_cos::ObjRef, prefix: &str, out: &mut HashMap<String, String>, depth: usize) {
+    fn walk(doc: &Document, r: evopdf_cos::ObjRef, prefix: &str, out: &mut HashMap<String, String>, depth: usize) {
         if depth > MAX_DEPTH || out.len() > 100_000 {
             return;
         }
@@ -586,7 +586,7 @@ pub fn rerender(doc: &mut Document, tpl: &Template) -> Result<Report, XfaError> 
     if form.pages.is_empty() {
         return Err(XfaError::Malformed("the template laid out to no pages".into()));
     }
-    // The AcroForm keeps only the fields PdfCraft did not generate. Any generated fields edited in
+    // The AcroForm keeps only the fields EvoPdf did not generate. Any generated fields edited in
     // this overlay (along with their appearance streams and widget kids) are freed so a replaced
     // password widget's value or masked appearance cannot stay in the overlay.
     let Some(root) = doc.root() else { return Err(XfaError::NotXfa) };

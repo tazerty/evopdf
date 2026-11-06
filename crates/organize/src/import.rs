@@ -19,7 +19,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object};
+use evopdf_cos::{Dict, Document, ObjRef, Object};
 
 use crate::{INHERITABLE, OrganizeError, pages_root, rebuild, walk};
 
@@ -333,7 +333,7 @@ fn insert_file_bookmark(doc: &mut Document, mark: &Mark, after: usize) -> Result
     let root = crate::outline::container(doc, &[])?;
     let item = doc.add(Object::Null);
     let mut d = Dict::new();
-    d.set(b"Title".to_vec(), Object::String(pdfcraft_cos::PdfString::text(&mark.title)));
+    d.set(b"Title".to_vec(), Object::String(evopdf_cos::PdfString::text(&mark.title)));
     d.set(b"Dest".to_vec(), Object::Array(vec![Object::Ref(mark.page), Object::name("Fit")]));
     if let Some((f, l, n)) = write_outline_level(doc, item, &mark.outline)? {
         d.set(b"First".to_vec(), Object::Ref(f));
@@ -689,7 +689,7 @@ fn resolve_field_conflicts(dst: &mut Document, fields: &[ObjRef]) -> Result<Vec<
     let planned = plan_renames(dst, fields, &mut taken);
     let mut renamed = Vec::new();
     for (node, new_t, old, new) in planned {
-        dst.update_dict(node, |d| d.set(b"T".to_vec(), Object::String(pdfcraft_cos::PdfString::text(&new_t))))?;
+        dst.update_dict(node, |d| d.set(b"T".to_vec(), Object::String(evopdf_cos::PdfString::text(&new_t))))?;
         renamed.push((old, new));
     }
     Ok(renamed)
@@ -892,7 +892,7 @@ fn add_kid(dst: &mut Document, field: ObjRef, kid: ObjRef) -> Result<(), Organiz
     Ok(())
 }
 
-/// PdfCraft patch (#1810): split a widget that doubles as its own field into a parent field
+/// EvoPdf patch (#1810): split a widget that doubles as its own field into a parent field
 /// holding the field keys (name, value, flags…) and a widget child holding the annotation keys
 /// (rectangle, appearance, page). The parent takes the widget's place among the top-level fields;
 /// later copies of the page add widget children of it, so every page has its own widget and the
@@ -1307,7 +1307,7 @@ pub(crate) fn set_attachments(dst: &mut Document, mut entries: Vec<(Vec<u8>, Obj
     // or Chinese letters) must not get ASCII bytes appended to it.
     let mut seen = std::collections::HashSet::new();
     for (k, _) in entries.iter_mut() {
-        let base = pdfcraft_cos::PdfString::literal(k.clone()).to_text();
+        let base = evopdf_cos::PdfString::literal(k.clone()).to_text();
         let mut text = base.clone();
         let mut n = 2;
         while !seen.insert(text.clone()) {
@@ -1315,13 +1315,13 @@ pub(crate) fn set_attachments(dst: &mut Document, mut entries: Vec<(Vec<u8>, Obj
             n += 1;
         }
         if text != base {
-            *k = pdfcraft_cos::PdfString::text(&text).bytes;
+            *k = evopdf_cos::PdfString::text(&text).bytes;
         }
     }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
     let mut names = Vec::new();
     for (k, v) in entries {
-        names.push(Object::String(pdfcraft_cos::PdfString::literal(k)));
+        names.push(Object::String(evopdf_cos::PdfString::literal(k)));
         names.push(v);
     }
     let mut tree = Dict::new();
@@ -1475,7 +1475,7 @@ fn add_outline(doc: &mut Document, marks: &[Mark]) -> Result<(), OrganizeError> 
     let (Some(&first_item), Some(&last_item)) = (items.first(), items.last()) else { return Ok(()) };
     for (i, (mark, r)) in marks.iter().zip(&items).enumerate() {
         let mut d = Dict::new();
-        d.set(b"Title".to_vec(), Object::String(pdfcraft_cos::PdfString::text(&mark.title)));
+        d.set(b"Title".to_vec(), Object::String(evopdf_cos::PdfString::text(&mark.title)));
         d.set(b"Parent".to_vec(), Object::Ref(outlines));
         d.set(b"Dest".to_vec(), Object::Array(vec![Object::Ref(mark.page), Object::name("Fit")]));
         if i > 0 {
@@ -1510,7 +1510,7 @@ fn add_outline(doc: &mut Document, marks: &[Mark]) -> Result<(), OrganizeError> 
 /// and its `/Matrix` undoes the page rotation, so it draws upright as displayed. Returns the
 /// form and its displayed size in points.
 pub fn page_as_form(dst: &mut Document, src: &Document, page: usize) -> Result<(ObjRef, (f64, f64)), OrganizeError> {
-    use pdfcraft_cos::Stream;
+    use evopdf_cos::Stream;
     let all = walk(src)?;
     // `walk` gives the inheritable attributes (resources, boxes, rotation); the content is
     // the page's own.

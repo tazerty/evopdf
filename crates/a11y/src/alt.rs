@@ -3,8 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pdfcraft_content::Matrix;
-use pdfcraft_cos::{DecodeBudget, Dict, Document, ObjRef, Object, PdfString, Stream};
+use evopdf_content::Matrix;
+use evopdf_cos::{DecodeBudget, Dict, Document, ObjRef, Object, PdfString, Stream};
 
 /// A Figure element (after the role map).
 #[derive(Clone, Debug, PartialEq)]
@@ -26,7 +26,7 @@ pub enum AltError {
     #[error("the page has more content than can be edited")]
     TooLarge,
     #[error("{0}")]
-    Cos(#[from] pdfcraft_cos::CosError),
+    Cos(#[from] evopdf_cos::CosError),
 }
 
 /// Why a structure tag cannot safely become an artifact.
@@ -53,7 +53,7 @@ pub enum ArtifactError {
     #[error("the page has more content than can be edited")]
     TooLarge,
     #[error(transparent)]
-    Cos(#[from] pdfcraft_cos::CosError),
+    Cos(#[from] evopdf_cos::CosError),
 }
 
 pub(crate) fn tree_root(doc: &Document) -> Option<Dict> {
@@ -152,7 +152,7 @@ fn page_properties(doc: &Document, page: &Dict) -> Dict {
 }
 
 /// The marked-content id a `BDC` opens, whether its property list is inline or named in `props`.
-fn bdc_mcid(doc: &Document, props: &Dict, op: &pdfcraft_content::Op) -> Option<i64> {
+fn bdc_mcid(doc: &Document, props: &Dict, op: &evopdf_content::Op) -> Option<i64> {
     match op.operands.get(1)? {
         Object::Dict(d) => d.get(b"MCID").and_then(Object::as_int),
         Object::Name(n) => props.get(n).map(|x| doc.resolve(x)).and_then(|x| x.as_dict().and_then(|d| d.get(b"MCID").and_then(Object::as_int))),
@@ -213,7 +213,7 @@ fn close(marks: &mut Vec<Mark>, matching: &mut usize, out: &mut HashMap<i64, [f6
 
 /// The page-space box a `Do` operator paints: a form's transformed `/BBox`, or the unit square for an image.
 /// `None` when the operand is not a resolvable XObject or the form's box is malformed.
-fn xobject_bbox(doc: &Document, xobjects: &Dict, op: &pdfcraft_content::Op, top: &Matrix) -> Option<[f64; 4]> {
+fn xobject_bbox(doc: &Document, xobjects: &Dict, op: &evopdf_content::Op, top: &Matrix) -> Option<[f64; 4]> {
     let r = op.name(0).and_then(|n| xobjects.get(n)).and_then(Object::as_ref)?;
     Some(match &*doc.get(r) {
         Object::Stream(s) if s.dict.name(b"Subtype") == Some(b"Form") => {
@@ -244,7 +244,7 @@ pub(crate) fn content_bboxes(doc: &Document, page: &Dict, ids: &HashSet<i64>) ->
     let mut matching = 0usize;
     let mut out = HashMap::new();
     let mut path: Vec<(f64, f64)> = Vec::new();
-    for op in pdfcraft_content::parse(&page_content(doc, page)).ops {
+    for op in evopdf_content::parse(&page_content(doc, page)).ops {
         crate::count_mark_reads(1);
         let inside = matching > 0;
         let top = ctm.last().copied().unwrap_or(Matrix([1.0, 0.0, 0.0, 1.0, 0.0, 0.0]));
@@ -310,7 +310,7 @@ pub(crate) fn content_bboxes(doc: &Document, page: &Dict, ids: &HashSet<i64>) ->
 pub fn figures(doc: &Document) -> Vec<Figure> {
     let Some(root) = tree_root(doc) else { return Vec::new() };
     let role_map = root.get(b"RoleMap").map(|o| doc.resolve(o)).and_then(|o| o.as_dict().cloned()).unwrap_or_default();
-    let pages = pdfcraft_model::pages(doc);
+    let pages = evopdf_model::pages(doc);
     let index: HashMap<ObjRef, usize> = pages.iter().enumerate().map(|(i, p)| (p.obj, i)).collect();
     let figures: Vec<(Element, Option<usize>)> = elements(doc)
         .into_iter()
@@ -372,13 +372,13 @@ fn content_entries(doc: &Document, page: &Dict) -> Option<Vec<Object>> {
     })
 }
 
-fn marked(doc: &Document, props: &Dict, op: &pdfcraft_content::Op, ids: &HashSet<i64>) -> bool {
+fn marked(doc: &Document, props: &Dict, op: &evopdf_content::Op, ids: &HashSet<i64>) -> bool {
     op.op == b"BDC" && bdc_mcid(doc, props, op).is_some_and(|n| ids.contains(&n))
 }
 
 /// Turn the figure's marked-content blocks into artifacts, rewriting only the streams that
 /// contain them. Other content streams, and unknown entries on a rewritten stream, stay.
-fn artifact_marked_content(doc: &mut Document, page: &pdfcraft_model::Page, ids: &HashSet<i64>) -> Result<bool, AltError> {
+fn artifact_marked_content(doc: &mut Document, page: &evopdf_model::Page, ids: &HashSet<i64>) -> Result<bool, AltError> {
     let Some(entries) = content_entries(doc, &page.dict) else { return Ok(false) };
     let props = page_properties(doc, &page.dict);
     let mut streams: Vec<Option<(Stream, Vec<u8>)>> = Vec::with_capacity(entries.len());
@@ -399,7 +399,7 @@ fn artifact_marked_content(doc: &mut Document, page: &pdfcraft_model::Page, ids:
         }
     }
     let decoded: Vec<&[u8]> = streams.iter().flatten().map(|(_, bytes)| bytes.as_slice()).collect();
-    let pieces = pdfcraft_content::Pieces::join(&decoded);
+    let pieces = evopdf_content::Pieces::join(&decoded);
     let edits: Vec<_> =
         pieces.parse().ops.into_iter().filter(|op| marked(doc, &props, op, ids)).map(|op| (op.span, b"/Artifact BMC".to_vec())).collect();
     if edits.is_empty() {
@@ -446,7 +446,7 @@ fn artifact_marked_content(doc: &mut Document, page: &pdfcraft_model::Page, ids:
 pub fn mark_decorative(doc: &mut Document, obj: ObjRef) -> Result<(), AltError> {
     let d = check_figure(doc, obj)?;
     let ids: HashSet<i64> = mcids(&d).into_iter().collect();
-    let pages = pdfcraft_model::pages(doc);
+    let pages = evopdf_model::pages(doc);
     let pg = d.get(b"Pg").and_then(Object::as_ref).or_else(|| elements(doc).into_iter().find(|e| e.object == obj).and_then(|e| e.page));
     if let Some(page) = pg.and_then(|p| pages.iter().find(|x| x.obj == p)).filter(|_| !ids.is_empty())
         && artifact_marked_content(doc, page, &ids)?
@@ -488,7 +488,7 @@ pub fn mark_tag_artifact(doc: &mut Document, obj: ObjRef) -> Result<(), Artifact
     if ids.is_empty() {
         return Err(ArtifactError::NoMarkedContent);
     }
-    let pages = pdfcraft_model::pages(doc);
+    let pages = evopdf_model::pages(doc);
     let page_ref = element.page.ok_or(ArtifactError::NoPage)?;
     let page = pages.iter().find(|page| page.obj == page_ref).ok_or(ArtifactError::NoPage)?;
     let mut content = Vec::new();
@@ -507,7 +507,7 @@ pub fn mark_tag_artifact(doc: &mut Document, obj: ObjRef) -> Result<(), Artifact
             }
         }
     }
-    let mut ops = pdfcraft_content::parse(&content).ops;
+    let mut ops = evopdf_content::parse(&content).ops;
     let mut found = HashSet::new();
     for op in &mut ops {
         let id = (op.op == b"BDC")
@@ -518,14 +518,14 @@ pub fn mark_tag_artifact(doc: &mut Document, obj: ObjRef) -> Result<(), Artifact
             .flatten()
             .filter(|id| ids.contains(id));
         if let Some(id) = id {
-            *op = pdfcraft_content::Op::new("BMC", vec![Object::name("Artifact")]);
+            *op = evopdf_content::Op::new("BMC", vec![Object::name("Artifact")]);
             found.insert(id);
         }
     }
     if found != ids {
         return Err(ArtifactError::ContentNotFound);
     }
-    let stream = doc.add(Object::Stream(Stream::flate(Dict::new(), &pdfcraft_content::serialize_ops(&ops))));
+    let stream = doc.add(Object::Stream(Stream::flate(Dict::new(), &evopdf_content::serialize_ops(&ops))));
     doc.update_dict(page.obj, |p| p.set(b"Contents".to_vec(), Object::Ref(stream)))?;
     if let Some(key) = page.dict.get(b"StructParents").and_then(Object::as_int) {
         clear_parent_tree(doc, key, obj).map_err(|e| ArtifactError::ParentTree(e.to_string()))?;

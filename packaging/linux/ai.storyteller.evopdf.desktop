@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=EvoPdf
+GenericName=PDF Editor
+Comment=Read, organize, combine, split and secure PDFs
+Exec=evopdf %U
+TryExec=evopdf
+Icon=ai.storyteller.evopdf
+Terminal=false
+StartupNotify=true
+StartupWMClass=ai.storyteller.evopdf
+Categories=Office;Viewer;
+Keywords=pdf;viewer;editor;annotate;sign;forms;merge;split;
+MimeType=application/pdf;

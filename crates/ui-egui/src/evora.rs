@@ -31,7 +31,7 @@
 //!
 //! Fixes of the bridge's daily use live here too: no save asked by Evora, whatever its reason, nor
 //! the member's own, interrupts typing: the bytes carry the typing and the text box stays open
-//! ([`PdfCraftApp::save_for_host`], EVORA-COL-63, F4); a submenu's arrow is drawn in a glyph the
+//! ([`EvoPdfApp::save_for_host`], EVORA-COL-63, F4); a submenu's arrow is drawn in a glyph the
 //! interface's fonts have ([`menu_button`], EVORA-COL-58, F5).
 //!
 //! Hidden commands and catalogue items stay out of the menus, the command palette, the keyboard
@@ -41,10 +41,10 @@
 //! signature field, the Signatures panel, automation). Links found in documents are not affected:
 //! they keep their confirmation dialog.
 
-use pdfcraft_engine::catalog::{self, ToolGroup};
-use pdfcraft_engine::{DocId, Edit};
+use evopdf_engine::catalog::{self, ToolGroup};
+use evopdf_engine::{DocId, Edit};
 
-use crate::{Dialog, LeftPanel, PdfCraftApp, QuickTool, SaveTarget};
+use crate::{Dialog, LeftPanel, EvoPdfApp, QuickTool, SaveTarget};
 
 /// Registry commands and catalogue items hidden from every list and ignored when run.
 pub(crate) const HIDDEN_COMMANDS: &[&str] = &[
@@ -165,7 +165,7 @@ fn tool_command(tool: &QuickTool) -> Option<&'static str> {
 
 /// Run at the start of every frame (`logic` and `ui`): no dialog, page tool or tool panel that only
 /// a hidden command opens stays open, whatever opened it.
-pub(crate) fn enforce(app: &mut PdfCraftApp) {
+pub(crate) fn enforce(app: &mut EvoPdfApp) {
     // CI witness only (`--features evora-witness-enforce`, never in the web build): the guard is off.
     if cfg!(feature = "evora-witness-enforce") {
         return;
@@ -183,7 +183,7 @@ pub(crate) fn enforce(app: &mut PdfCraftApp) {
     }
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Evora (EVO-CMD, COL-43): the registry's commands as this build offers them, in registry order
     /// (the menus and the command palette list the same table), hidden commands left out:
     /// `(id, label, menu, enabled)`, with the label and the menu's name as displayed in the app's
@@ -192,11 +192,11 @@ impl PdfCraftApp {
     pub fn evora_commands(&self) -> Vec<(&'static str, String, Option<String>, bool)> {
         crate::i18n::set_current(crate::i18n::Lang::from_pref(&self.language));
         let active = self.active_ids().map(|(_, id)| id);
-        pdfcraft_engine::commands::COMMANDS
+        evopdf_engine::commands::COMMANDS
             .iter()
             .filter(|spec| !hidden(spec.id))
             .map(|spec| {
-                let label = pdfcraft_engine::commands::current_label(spec, &self.session, active);
+                let label = evopdf_engine::commands::current_label(spec, &self.session, active);
                 let label = crate::i18n::menu_label(spec.id, &label);
                 let menu = spec.menu.map(|m| crate::i18n::t(m).to_string());
                 (spec.id, label, menu, self.command_enabled(spec))
@@ -213,7 +213,7 @@ pub enum HostSaveAnswer {
     NotFound,
     /// Nothing to save: `evora:ack {ok: true, code: "clean"}`.
     Clean,
-    /// Save now ([`PdfCraftApp::save_for_host`]): `evora:save`, or `evora:ack {ok: false, code}` with
+    /// Save now ([`EvoPdfApp::save_for_host`]): `evora:save`, or `evora:ack {ok: false, code}` with
     /// the code it returns when the engine refuses what the member typed.
     Save,
 }
@@ -226,14 +226,14 @@ pub const REFUSED_TEXT: &str = "unsupported";
 pub const REFUSED_FIELD: &str = "invalid_content";
 
 /// Evora (EVORA-COL-63, F4): a save Evora acknowledged whose bytes carried the member's typing
-/// ([`PdfCraftApp::save_for_host`]): the document's edit generation then, and that typing.
+/// ([`EvoPdfApp::save_for_host`]): the document's edit generation then, and that typing.
 pub(crate) struct HostTypedSave {
     pub(crate) id: DocId,
     pub(crate) generation: u64,
     pub(crate) edits: Vec<Edit>,
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Evora (EVORA-COL-58, F4): whether the member is typing in tab `index`: new text being added, a
     /// paragraph open for editing, a form field or the Fill & Sign type box open, or a text field of
     /// the interface holding the keyboard.
@@ -292,7 +292,7 @@ impl PdfCraftApp {
 
     /// Evora (EVORA-COL-63, F4): save tab `index` for Evora (`evora:request-save`, whatever its
     /// reason, and the member's own Save in the Atelier). What is being typed goes with the bytes
-    /// ([`pdfcraft_engine::Session::save_bytes_with`]) and stays open: cursor, keyboard and tool
+    /// ([`evopdf_engine::Session::save_bytes_with`]) and stays open: cursor, keyboard and tool
     /// unchanged, the next letters go on into the text. The document itself is left as it is until
     /// the member commits the typing; Evora's acknowledgement then holds while neither changes.
     /// Without typing, or without Evora, Save as before. `Ok` as [`Self::save_view`]; `Err` with the
@@ -337,7 +337,7 @@ impl PdfCraftApp {
         let Some(save) = self.host_save_ack.as_ref() else { return false };
         match save(id.0, &name, &bytes, false) {
             Ok(Some(ticket)) => {
-                self.pending_host_saves.push(crate::PendingHostSave { ticket, id, bytes, generation, typing: Some(edits), after: Box::new(|_: &mut PdfCraftApp| {}) });
+                self.pending_host_saves.push(crate::PendingHostSave { ticket, id, bytes, generation, typing: Some(edits), after: Box::new(|_: &mut EvoPdfApp| {}) });
                 false
             }
             Ok(None) => {
@@ -360,7 +360,7 @@ impl PdfCraftApp {
         let Some(i) = self.active else { return false };
         let Some(view) = self.views.get_mut(i) else { return false };
         if start {
-            let style = pdfcraft_engine::AddedText { size: 14.0, ..Default::default() };
+            let style = evopdf_engine::AddedText { size: 14.0, ..Default::default() };
             let draft = crate::content_ui::TextDraft { page: 0, index: None, rect: [24.0, 60.0, 280.0, 80.0], text: text.to_string(), style, focus: false };
             view.content.draft = Some(draft);
             self.quick_tool = QuickTool::AddText;

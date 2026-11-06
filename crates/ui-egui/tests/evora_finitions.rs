@@ -6,7 +6,7 @@
 //! - « glyphes » (F5): the main menu open, no text it paints, its submenus' arrows included, has a
 //!   character missing from the interface's fonts (egui's arrow U+23F5 had none since E10 took the
 //!   emoji faces out, and showed as « ? »). Twin: the menu's submenus are drawn. Run with
-//!   `PDFCRAFT_SYSTEM_FONTS=0`, so that no installed face stands in for a missing glyph.
+//!   `EVOPDF_SYSTEM_FONTS=0`, so that no installed face stands in for a missing glyph.
 //! - « garde-menus » (EVORA-COL-63, Evora's RC2-11): no source of the shell calls egui's
 //!   `menu_button` or `SubMenuButton::new` itself: every submenu goes through `evora::menu_button`,
 //!   whose arrow the interface's fonts draw. Twin: the wrapper's own calls are found.
@@ -16,7 +16,7 @@ mod evora_support;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use evora_support::{Verdict, harness};
-use pdfcraft_ui_egui::{PdfCraftApp, family_has_char};
+use evopdf_ui_egui::{EvoPdfApp, family_has_char};
 
 /// A character drawn without a glyph shows as « ? »; spaces, controls and format characters draw
 /// nothing.
@@ -26,7 +26,7 @@ fn drawn(c: char) -> bool {
 
 /// Every character painted on the last frame that no face of its text's families has in its character
 /// map (`family_has_char`), once each.
-fn missing_glyphs(h: &Harness<'static, PdfCraftApp>) -> Vec<char> {
+fn missing_glyphs(h: &Harness<'static, EvoPdfApp>) -> Vec<char> {
     fn texts(shape: &egui::Shape, out: &mut Vec<std::sync::Arc<egui::Galley>>) {
         match shape {
             egui::Shape::Vec(shapes) => shapes.iter().for_each(|s| texts(s, out)),
@@ -55,15 +55,15 @@ fn missing_glyphs(h: &Harness<'static, PdfCraftApp>) -> Vec<char> {
 fn the_main_menu_draws_every_glyph() {
     let mut v = Verdict::new("glyphes");
     // Premise: the interface's fonts alone, as in the web build (no installed face as a fallback).
-    let alone = std::env::var("PDFCRAFT_SYSTEM_FONTS").is_ok_and(|value| value == "0");
-    v.holds(alone, || "prémisse : PDFCRAFT_SYSTEM_FONTS=0 absent, des polices du système servent de repli".to_string());
+    let alone = std::env::var("EVOPDF_SYSTEM_FONTS").is_ok_and(|value| value == "0");
+    v.holds(alone, || "prémisse : EVOPDF_SYSTEM_FONTS=0 absent, des polices du système servent de repli".to_string());
     let mut h = harness();
     // Premise: the detector answers (a letter is drawn, a private-use character isn't).
     let defs = h.ctx.fonts(|f| f.definitions().clone());
     let answers = family_has_char(&defs, &egui::FontFamily::Proportional, 'A') && !family_has_char(&defs, &egui::FontFamily::Proportional, '\u{10FFFD}');
     v.holds(answers, || "prémisse : détecteur de glyphes muet (A sans glyphe ou U+10FFFD avec)".to_string());
     let before = missing_glyphs(&h);
-    let submenus = |h: &Harness<'static, PdfCraftApp>| ["File ", "Edit ", "Pages ", "View ", "Help "].map(|p| h.query_all_by_label_contains(p).count());
+    let submenus = |h: &Harness<'static, EvoPdfApp>| ["File ", "Edit ", "Pages ", "View ", "Help "].map(|p| h.query_all_by_label_contains(p).count());
     let closed = submenus(&h);
     if let Some(menu) = h.query_all_by_label("Menu").next() {
         menu.click();

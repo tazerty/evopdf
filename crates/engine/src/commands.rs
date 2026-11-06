@@ -377,10 +377,10 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("page.split", "Split document…", PAGES, None, Assembly, "scissors"),
     c("page.number", "Number pages…", PAGES, None, Assembly, "hash"),
     c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
-    // Evora (EVORA-COL E1): help.discord, help.app_page and help.website (ArtCraft links) removed.
-    c("help.github", "PdfCraft on GitHub", HELP, None, Nothing, "code-xml"),
+    // Evora (EVORA-COL E1): help.discord, help.app_page and help.website (Upstream links) removed.
+    c("help.github", "EvoPdf on GitHub", HELP, None, Nothing, "code-xml"),
     c("help.check_updates", "Check for updates…", HELP, None, Nothing, "cloud"),
-    c("help.about", "About PdfCraft", HELP, None, Nothing, "info"),
+    c("help.about", "About EvoPdf", HELP, None, Nothing, "info"),
 ];
 
 pub fn command(id: &str) -> Option<&'static CommandSpec> {

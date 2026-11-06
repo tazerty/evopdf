@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 
-use pdfcraft_cos::{Dict, Document as Cos, ObjRef, Object};
+use evopdf_cos::{Dict, Document as Cos, ObjRef, Object};
 
 use crate::Document;
 
@@ -36,7 +36,7 @@ impl Document {
         let img = self.page_images(page).into_iter().nth(index).ok_or_else(|| format!("page {} has no image {}", page + 1, index + 1))?;
         let object = img.object.ok_or("the image has no object")?;
         let picture = if img.is_form { picture_in_form(&editor.cos, object).ok_or("this artwork holds no picture")? } else { object };
-        pdfcraft_create::image_file(&editor.cos, picture)
+        evopdf_create::image_file(&editor.cos, picture)
     }
 
     /// Copy Image: picture `index` on `page` at its own resolution, as straight (unpremultiplied)
@@ -68,26 +68,26 @@ impl Document {
         self.check_copying().map_err(|e| e.to_string())?;
         let editor = self.editor.as_ref().ok_or("the document can't be read")?;
         let item = self.added().iter().filter(|a| a.page == page).nth(index);
-        let Some(pdfcraft_edit::Content::Image(img)) = item.map(|a| &a.content) else {
+        let Some(evopdf_edit::Content::Image(img)) = item.map(|a| &a.content) else {
             return Err(format!("item {} on page {} is not an added image", index + 1, page + 1));
         };
         picture_file(&editor.cos, img.image)
     }
 }
 
-/// An added image's picture as a file: [`pdfcraft_create::image_file`], except that a JPEG 2000
+/// An added image's picture as a file: [`evopdf_create::image_file`], except that a JPEG 2000
 /// picture, which Add Image stores as the file it was given, is that file.
 fn picture_file(cos: &Cos, image: ObjRef) -> Result<(&'static str, Vec<u8>), String> {
     match &*cos.get(image) {
         Object::Stream(s) if s.dict.name(b"Subtype") == Some(b"Image") && s.dict.name(b"Filter") == Some(b"JPXDecode") => Ok(("jp2", s.raw.to_vec())),
-        _ => pdfcraft_create::image_file(cos, image),
+        _ => evopdf_create::image_file(cos, image),
     }
 }
 
 /// Whether image object `image` in `cos` is the picture `file` (as [`picture_file`] writes it).
 /// The sizes are compared first, so an unrelated image is not re-encoded to find out.
 pub(crate) fn is_picture(cos: &Cos, image: ObjRef, file: &[u8]) -> bool {
-    let size = |s: &pdfcraft_cos::Stream| Some((u32::try_from(s.dict.int(b"Width")?).ok()?, u32::try_from(s.dict.int(b"Height")?).ok()?));
+    let size = |s: &evopdf_cos::Stream| Some((u32::try_from(s.dict.int(b"Width")?).ok()?, u32::try_from(s.dict.int(b"Height")?).ok()?));
     // The object at that number now, not one of an earlier generation of it.
     if cos.generation(image.num) != image.generation {
         return false;
@@ -106,8 +106,8 @@ pub(crate) fn is_picture(cos: &Cos, image: ObjRef, file: &[u8]) -> bool {
 /// second paste from another document finds the first one's.
 pub(crate) fn added_picture(cos: &Cos, file: &[u8]) -> Option<ObjRef> {
     let mut seen = std::collections::HashSet::new();
-    pdfcraft_edit::list_added(cos).into_iter().find_map(|a| match a.content {
-        pdfcraft_edit::Content::Image(img) if seen.insert(img.image) && is_picture(cos, img.image, file) => Some(img.image),
+    evopdf_edit::list_added(cos).into_iter().find_map(|a| match a.content {
+        evopdf_edit::Content::Image(img) if seen.insert(img.image) && is_picture(cos, img.image, file) => Some(img.image),
         _ => None,
     })
 }

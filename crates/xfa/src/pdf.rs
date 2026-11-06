@@ -4,8 +4,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use pdfcraft_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
-use pdfcraft_fonts::{literal, win_ansi};
+use evopdf_cos::{Dict, Document, ObjRef, Object, PdfString, Stream};
+use evopdf_fonts::{literal, win_ansi};
 
 use crate::XfaError;
 use crate::layout::{Action, BorderShape, Form, Item, Page, Rounded, Widget, WidgetKind};
@@ -18,7 +18,7 @@ pub const SOM_KEY: &[u8] = b"PCSom";
 /// laid out again.
 pub const LAYOUT_KEY: &[u8] = b"PCXfaLayout";
 /// Private key on generated push buttons whose template has a click script: the button has no
-/// PDF action (the script is XFA's, not Acrobat JavaScript); PdfCraft runs the script by the
+/// PDF action (the script is XFA's, not Acrobat JavaScript); EvoPdf runs the script by the
 /// field's SOM path.
 pub const CLICK_KEY: &[u8] = b"PCXfaClick";
 
@@ -535,7 +535,7 @@ impl Emitter<'_> {
                 mk.set(b"CA".to_vec(), Object::String(PdfString::text(caption)));
                 if let Some(Action::Script(_)) = &w.action {
                     // An XFA click script is no Acrobat JavaScript: no PDF action, which other
-                    // viewers would run; PdfCraft finds the script by the field's SOM path.
+                    // viewers would run; EvoPdf finds the script by the field's SOM path.
                     d.set(CLICK_KEY.to_vec(), Object::Bool(true));
                 } else if let Some(a) = &w.action {
                     let mut ad = Dict::new();
@@ -713,11 +713,11 @@ impl Emitter<'_> {
                 Item::Text(s) => {
                     // The form's own text, set in the standard fonts: what they can't draw is
                     // shown as `?` and reported once (the layout goes on), never silently.
-                    if let Some(c) = pdfcraft_fonts::first_undrawable(&s.text) {
+                    if let Some(c) = evopdf_fonts::first_undrawable(&s.text) {
                         const PREFIX: &str = "some of the form's text has characters the standard fonts can't draw";
                         if !self.warnings.iter().any(|w| w.starts_with(PREFIX)) {
                             self.warnings.push(format!(
-                                "{PREFIX} (the first is \"{}\" (U+{:04X})); they are shown as ? until PdfCraft can embed fonts for them",
+                                "{PREFIX} (the first is \"{}\" (U+{:04X})); they are shown as ? until EvoPdf can embed fonts for them",
                                 c.escape_debug(),
                                 u32::from(c)
                             ));
@@ -782,7 +782,7 @@ impl Emitter<'_> {
     /// A link annotation over span `s` (on a page `page_height` tall), when its text links
     /// somewhere: over the text it draws, without the spaces around it, and opening its address.
     /// A span that goes on the link `last` ended in, on the same line, widens that annotation
-    /// instead (a link whose text changes style partway is one link). An address PdfCraft
+    /// instead (a link whose text changes style partway is one link). An address EvoPdf
     /// wouldn't open from a document leaves the text as plain text, with one warning for the form.
     fn text_link(&mut self, s: &Span, page_height: f64, page_ref: ObjRef, last: &mut Option<LinkPiece>) -> Result<Option<ObjRef>, XfaError> {
         let piece = self.link_piece(s, page_height);
@@ -818,7 +818,7 @@ impl Emitter<'_> {
 
     /// Where span `s` links to and the rectangle (PDF user space, on a page `page_height` tall)
     /// over the text it draws, without the spaces around it. `None` for text that links nowhere,
-    /// draws nothing, or links to an address PdfCraft wouldn't open from a document, which is
+    /// draws nothing, or links to an address EvoPdf wouldn't open from a document, which is
     /// warned about once for the form.
     fn link_piece(&mut self, s: &Span, page_height: f64) -> Option<(String, [f64; 4])> {
         let href = s.link.as_deref()?;
@@ -828,7 +828,7 @@ impl Emitter<'_> {
         }
         let Some(target) = link_target(href) else {
             if !self.warnings.iter().any(|w| w.starts_with(LINK_LEFT_OUT)) {
-                self.warnings.push(format!("{LINK_LEFT_OUT}: PdfCraft makes links only of web (http, https) and email (mailto) addresses"));
+                self.warnings.push(format!("{LINK_LEFT_OUT}: EvoPdf makes links only of web (http, https) and email (mailto) addresses"));
             }
             return None;
         };
@@ -853,10 +853,10 @@ struct LinkPiece {
 /// How the layout warning about a link left out starts.
 const LINK_LEFT_OUT: &str = "a link in the form's text was left as plain text";
 
-/// The longest link address kept, in characters: as long as PdfCraft opens from a document.
+/// The longest link address kept, in characters: as long as EvoPdf opens from a document.
 const MAX_LINK: usize = 2048;
 
-/// `href` as the address of a link PdfCraft makes from a form's text: a web (http, https) or
+/// `href` as the address of a link EvoPdf makes from a form's text: a web (http, https) or
 /// email (mailto) address, trimmed, of at most [`MAX_LINK`] characters and without control
 /// characters. `None` for anything else (scripts, files, data, relative paths). Opening it still
 /// goes through the app's own checks and prompt.
@@ -1064,12 +1064,12 @@ pub struct XfaShape {
     pub needs_rendering: bool,
     /// The AcroForm has fields of its own.
     pub has_fields: bool,
-    /// PdfCraft laid the form out (the layout mark is there).
+    /// EvoPdf laid the form out (the layout mark is there).
     pub laid_out: bool,
 }
 
 impl XfaShape {
-    /// Whether taking the XFA out leaves a form every viewer shows: the pages PdfCraft laid out
+    /// Whether taking the XFA out leaves a form every viewer shows: the pages EvoPdf laid out
     /// (with their fields), or a static form's own pages and fields. A dynamic form that was
     /// never laid out has only placeholder pages: stripping it would leave nothing.
     pub fn strippable(self) -> bool {
@@ -1097,7 +1097,7 @@ const MAX_STRIP_FIELDS: usize = 1_000_000;
 /// Take the XFA out of a document, leaving what every viewer shows: the pages as laid out
 /// and, when the fields were kept, an ordinary AcroForm. The packets (template, data and
 /// all), `/NeedsRendering`, the layout mark, the overrides and Reader usage rights go, and
-/// the fields lose the private keys PdfCraft gave them. A flattened form (no fields left)
+/// the fields lose the private keys EvoPdf gave them. A flattened form (no fields left)
 /// becomes a plain PDF; one with its fields becomes a static form that Adobe's viewers no
 /// longer lay out again. What the packets held beyond the fields is counted in the report,
 /// so the user can be told; the caller decides whether the form is one to strip

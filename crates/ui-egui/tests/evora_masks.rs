@@ -47,9 +47,9 @@
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use pdfcraft_engine::catalog::TOOL_GROUPS;
-use pdfcraft_engine::commands::COMMANDS;
-use pdfcraft_ui_egui::{Dialog, LeftPanel, Mode, PdfCraftApp, QuickTool, RightPanel};
+use evopdf_engine::catalog::TOOL_GROUPS;
+use evopdf_engine::commands::COMMANDS;
+use evopdf_ui_egui::{Dialog, LeftPanel, Mode, EvoPdfApp, QuickTool, RightPanel};
 
 /// D-9, COL-05: digital signatures, certification, and the timestamp planned beside them.
 const SIGNATURE: &[&str] = &["sign.digital", "sign.certify", "sign.certify_invisible", "sign.timestamp"];
@@ -109,32 +109,32 @@ impl Verdict {
     }
 
     /// `label` is neither an AccessKit node (exact label) nor a painted text (exact text).
-    fn absent(&mut self, h: &Harness<'static, PdfCraftApp>, surface: &str, label: &str) {
+    fn absent(&mut self, h: &Harness<'static, EvoPdfApp>, surface: &str, label: &str) {
         let (n, t) = (nodes(h, label), painted_exact(h, label));
         self.holds(n + t == 0, || format!("{surface} : « {label} » visible ({n} nœud(s), {t} texte(s) dessiné(s))"));
     }
 
     /// `label` is not an AccessKit node (exact label): for the palette, whose search field paints
     /// the query itself.
-    fn absent_node(&mut self, h: &Harness<'static, PdfCraftApp>, surface: &str, label: &str) {
+    fn absent_node(&mut self, h: &Harness<'static, EvoPdfApp>, surface: &str, label: &str) {
         let n = nodes(h, label);
         self.holds(n == 0, || format!("{surface} : « {label} » proposé ({n} nœud(s))"));
     }
 
     /// No AccessKit node and no painted text contains `needle`.
-    fn absent_contains(&mut self, h: &Harness<'static, PdfCraftApp>, surface: &str, needle: &str) {
+    fn absent_contains(&mut self, h: &Harness<'static, EvoPdfApp>, surface: &str, needle: &str) {
         let n = h.query_all_by_label_contains(needle).count() + painted(h).iter().filter(|t| t.contains(needle)).count();
         self.holds(n == 0, || format!("{surface} : « {needle} » visible ({n} fois, sous-chaîne)"));
     }
 
     /// Witness: `label` is on screen (AccessKit node or painted text, exact).
-    fn present(&mut self, h: &Harness<'static, PdfCraftApp>, surface: &str, label: &str) {
+    fn present(&mut self, h: &Harness<'static, EvoPdfApp>, surface: &str, label: &str) {
         let n = nodes(h, label) + painted_exact(h, label);
         self.holds(n > 0, || format!("{surface} : témoin « {label} » absent (surface non dessinée ?)"));
     }
 
     /// Witness: a node or a painted text contains `needle`.
-    fn present_contains(&mut self, h: &Harness<'static, PdfCraftApp>, surface: &str, needle: &str) {
+    fn present_contains(&mut self, h: &Harness<'static, EvoPdfApp>, surface: &str, needle: &str) {
         let n = h.query_all_by_label_contains(needle).count() + painted(h).iter().filter(|t| t.contains(needle)).count();
         self.holds(n > 0, || format!("{surface} : témoin « {needle} » absent (surface non dessinée ?)"));
     }
@@ -148,12 +148,12 @@ impl Verdict {
     }
 }
 
-fn nodes(h: &Harness<'static, PdfCraftApp>, label: &str) -> usize {
+fn nodes(h: &Harness<'static, EvoPdfApp>, label: &str) -> usize {
     h.query_all_by_label(label).count()
 }
 
 /// Every text painted on the last frame (whole texts, even when drawn cut short).
-fn painted(h: &Harness<'static, PdfCraftApp>) -> Vec<String> {
+fn painted(h: &Harness<'static, EvoPdfApp>) -> Vec<String> {
     h.output()
         .shapes
         .iter()
@@ -164,7 +164,7 @@ fn painted(h: &Harness<'static, PdfCraftApp>) -> Vec<String> {
         .collect()
 }
 
-fn painted_exact(h: &Harness<'static, PdfCraftApp>, label: &str) -> usize {
+fn painted_exact(h: &Harness<'static, EvoPdfApp>, label: &str) -> usize {
     painted(h).iter().filter(|t| t.as_str() == label).count()
 }
 
@@ -203,13 +203,13 @@ fn group_label(id: &str) -> &'static str {
 
 /// Painted tile notes of the expanded All tools view that name `label`: a note lists the items the
 /// search found the tool by, joined by « · » (all_tools_ui.rs `tile`).
-fn named_in_notes(h: &Harness<'static, PdfCraftApp>, label: &str) -> usize {
+fn named_in_notes(h: &Harness<'static, EvoPdfApp>, label: &str) -> usize {
     painted(h).iter().filter(|t| t.split(" · ").any(|s| s == label)).count()
 }
 
 /// The expanded All tools view searched for `label`, typed in lower case without its « … » (the
 /// search field paints what is typed, which then differs from every label).
-fn view_search(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
+fn view_search(h: &mut Harness<'static, EvoPdfApp>, label: &str) {
     h.state_mut().all_tools_query = label.trim_end_matches('…').to_lowercase();
     h.run_steps(3);
 }
@@ -260,9 +260,9 @@ fn fixture() -> Vec<u8> {
     ])
 }
 
-fn harness(document: bool, setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Harness<'static, PdfCraftApp> {
+fn harness(document: bool, setup: impl FnOnce(&mut EvoPdfApp) + 'static) -> Harness<'static, EvoPdfApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 1000.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         if document {
             app.open_bytes("atelier.pdf", None, fixture()).expect("the fixture opens");
@@ -278,9 +278,9 @@ fn harness(document: bool, setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Ha
 /// EVORA-COL-53: the fixture opened straight into the Edit workspace, which goes through the same
 /// `enter_mode` as the mode bar (`default_mode`, applied on open), in a tall window so that a
 /// picture's whole right-click menu is on screen.
-fn edit_workspace() -> Harness<'static, PdfCraftApp> {
+fn edit_workspace() -> Harness<'static, EvoPdfApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 1500.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.default_mode = Mode::Edit;
         app.open_bytes("atelier.pdf", None, fixture()).expect("the fixture opens");
@@ -291,12 +291,12 @@ fn edit_workspace() -> Harness<'static, PdfCraftApp> {
 }
 
 /// AccessKit nodes and painted texts whose label is exactly `label`.
-fn shown(h: &Harness<'static, PdfCraftApp>, label: &str) -> usize {
+fn shown(h: &Harness<'static, EvoPdfApp>, label: &str) -> usize {
     nodes(h, label) + painted_exact(h, label)
 }
 
 /// A right-click on the centre of the fixture's picture (page 1), as a member does.
-fn right_click_picture(h: &mut Harness<'static, PdfCraftApp>) {
+fn right_click_picture(h: &mut Harness<'static, EvoPdfApp>) {
     let Some(page) = h.state().active.and_then(|i| h.state().views.get(i)).and_then(|v| v.page_screen_rect(0)) else {
         return;
     };
@@ -312,7 +312,7 @@ fn right_click_picture(h: &mut Harness<'static, PdfCraftApp>) {
 }
 
 /// Back to a calm state between checks: no dialog, palette or page tool.
-fn calm(h: &mut Harness<'static, PdfCraftApp>) {
+fn calm(h: &mut Harness<'static, EvoPdfApp>) {
     let app = h.state_mut();
     app.dialog = None;
     app.palette_open = false;
@@ -323,7 +323,7 @@ fn calm(h: &mut Harness<'static, PdfCraftApp>) {
 
 /// The palette searched for `label`, typed in lower case without its "…" (the search field paints
 /// what is typed, which then differs from every label).
-fn palette_for(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
+fn palette_for(h: &mut Harness<'static, EvoPdfApp>, label: &str) {
     calm(h);
     let query = label.trim_end_matches('…').to_lowercase();
     h.state_mut().set_option("palette", &query).unwrap();
@@ -331,7 +331,7 @@ fn palette_for(h: &mut Harness<'static, PdfCraftApp>, label: &str) {
 }
 
 /// All tools, expanded (« View more »).
-fn all_tools(h: &mut Harness<'static, PdfCraftApp>) {
+fn all_tools(h: &mut Harness<'static, EvoPdfApp>) {
     calm(h);
     let app = h.state_mut();
     app.left_open = true;
@@ -341,7 +341,7 @@ fn all_tools(h: &mut Harness<'static, PdfCraftApp>) {
 }
 
 /// Tool panel `id`, asked as automation does (`--tool`).
-fn tool_panel(h: &mut Harness<'static, PdfCraftApp>, id: &str) {
+fn tool_panel(h: &mut Harness<'static, EvoPdfApp>, id: &str) {
     calm(h);
     h.state_mut().left_open = true;
     let _ = h.state_mut().set_option("tool", id);
@@ -349,7 +349,7 @@ fn tool_panel(h: &mut Harness<'static, PdfCraftApp>, id: &str) {
 }
 
 /// The palette proposes none of `ids`' labels.
-fn palette_offers_none(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, ids: &[&'static str]) {
+fn palette_offers_none(v: &mut Verdict, h: &mut Harness<'static, EvoPdfApp>, ids: &[&'static str]) {
     for id in ids {
         for label in labels(id) {
             palette_for(h, &label);
@@ -364,7 +364,7 @@ fn palette_offers_none(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, i
 /// one must (the twin, which shows the palette lists groups at all). The label must be on no node
 /// before the palette opens, so that a node found afterwards is the palette's. One check per search;
 /// each cause of a fault has its own wording (`gates.py masks-witness` reads « proposé »).
-fn palette_group(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, id: &str, offered: bool) {
+fn palette_group(v: &mut Verdict, h: &mut Harness<'static, EvoPdfApp>, id: &str, offered: bool) {
     let label = group_label(id);
     let was_open = h.state().left_open;
     calm(h);
@@ -394,7 +394,7 @@ fn palette_group(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, id: &st
 
 /// Running `ids` (as menus, shortcuts and automation do) leaves no dialog of theirs, no page tool
 /// of theirs and no tool panel of theirs.
-fn running_leaves_nothing(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, ids: &[&'static str], dialogs: &[Dialog], tools: &[QuickTool]) {
+fn running_leaves_nothing(v: &mut Verdict, h: &mut Harness<'static, EvoPdfApp>, ids: &[&'static str], dialogs: &[Dialog], tools: &[QuickTool]) {
     for id in ids.iter().filter(|id| registered(id) && !PICKERS.contains(id)) {
         calm(h);
         h.state_mut().left = LeftPanel::AllTools;
@@ -411,7 +411,7 @@ fn running_leaves_nothing(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>
 }
 
 /// Dialogs and page tools set directly (automation, any other path) don't survive a frame.
-fn forced_state_closes(v: &mut Verdict, h: &mut Harness<'static, PdfCraftApp>, dialogs: &[Dialog], tools: &[QuickTool]) {
+fn forced_state_closes(v: &mut Verdict, h: &mut Harness<'static, EvoPdfApp>, dialogs: &[Dialog], tools: &[QuickTool]) {
     for d in dialogs {
         calm(h);
         h.state_mut().dialog = Some(*d);
@@ -549,7 +549,7 @@ fn the_atelier_scope_q47_a_is_respected() {
     let mut v = Verdict::new("perimetre-q47");
     // Home, without a document, with a recent file the engine would list.
     let mut home = harness(false, |app| {
-        app.recent.push(pdfcraft_ui_egui::RecentFile { name: "recent-atelier.pdf".into(), path: "/nowhere/recent-atelier.pdf".into(), pages: 1, size: 0 });
+        app.recent.push(evopdf_ui_egui::RecentFile { name: "recent-atelier.pdf".into(), path: "/nowhere/recent-atelier.pdf".into(), pages: 1, size: 0 });
     });
     v.absent(&home, "Home", "Recent");
     v.absent(&home, "Home", "Clear Recent Files");

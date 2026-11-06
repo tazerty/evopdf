@@ -5,7 +5,7 @@
 //! - « saisie », « saisie-paragraphe », « saisie-champ » (F4, Evora's D3-e): Evora asks for a save
 //!   (`evora:request-save`, any reason: autosave, a hidden tab, the member's button, leaving) while
 //!   the member types new text, retypes an existing paragraph, or fills a form field. The bridge's
-//!   answer (`PdfCraftApp::host_save_answer`, then `save_for_host`, as `apps/pdfcraft-web` runs them)
+//!   answer (`EvoPdfApp::host_save_answer`, then `save_for_host`, as `apps/evopdf-web` runs them)
 //!   hands Evora bytes that hold the whole text typed so far, the box stays open on the keyboard with
 //!   the same tool, the next letters (H among them, the Hand's key) go on into the text, and a second
 //!   save in the middle carries the longer text. Evora's acknowledgement leaves nothing to save until
@@ -26,9 +26,9 @@ use std::sync::{Arc, Mutex};
 
 use egui_kittest::Harness;
 use evora_support::{Verdict, click_page, fixture, harness, harness_with, type_text};
-use pdfcraft_cos::Object;
-use pdfcraft_engine::{AddedContent, AddedText, Edit, Session};
-use pdfcraft_ui_egui::{HostSaveAnswer, PdfCraftApp, QuickTool, SaveTarget};
+use evopdf_cos::Object;
+use evopdf_engine::{AddedContent, AddedText, Edit, Session};
+use evopdf_ui_egui::{HostSaveAnswer, EvoPdfApp, QuickTool, SaveTarget};
 
 /// What the member types before Evora's first save, between the two saves (H picks the Hand), after.
 const FIRST: &str = "Ligne ajoutée dans Col";
@@ -44,7 +44,7 @@ struct Host {
 
 impl Host {
     /// Installed as the shell's acknowledging host, as the web bridge installs Evora's.
-    fn install(&self, app: &mut PdfCraftApp) {
+    fn install(&self, app: &mut EvoPdfApp) {
         let host = self.clone();
         app.host_save_ack = Some(Box::new(move |_doc: u64, _name: &str, bytes: &[u8], _save_as: bool| -> Result<Option<u64>, String> {
             let ticket = host.next.fetch_add(1, Ordering::SeqCst) + 1;
@@ -66,7 +66,7 @@ impl Host {
 
 /// Evora's `evora:request-save` as the web bridge handles it (`EvoraApp::request_save`): its answer,
 /// and the save it then runs.
-fn request_save(h: &mut Harness<'static, PdfCraftApp>) -> (HostSaveAnswer, Result<bool, &'static str>) {
+fn request_save(h: &mut Harness<'static, EvoPdfApp>) -> (HostSaveAnswer, Result<bool, &'static str>) {
     let answer = h.state().host_save_answer(0);
     let saved = if answer == HostSaveAnswer::Save { h.state_mut().save_for_host(0) } else { Ok(false) };
     h.run_steps(3);
@@ -74,7 +74,7 @@ fn request_save(h: &mut Harness<'static, PdfCraftApp>) -> (HostSaveAnswer, Resul
 }
 
 /// Evora's `evora:saved {ok: true}` for `ticket`, applied on the next frames.
-fn acknowledge(h: &mut Harness<'static, PdfCraftApp>, ticket: u64) {
+fn acknowledge(h: &mut Harness<'static, EvoPdfApp>, ticket: u64) {
     let outcomes = h.state().host_save_outcomes.clone();
     if let Ok(mut queue) = outcomes.lock() {
         queue.push((ticket, true));
@@ -83,7 +83,7 @@ fn acknowledge(h: &mut Harness<'static, PdfCraftApp>, ticket: u64) {
 }
 
 /// `bytes`, reopened as Evora's next open would.
-fn reopened(bytes: &[u8]) -> Option<(Session, pdfcraft_engine::DocId)> {
+fn reopened(bytes: &[u8]) -> Option<(Session, evopdf_engine::DocId)> {
     let mut session = Session::new();
     let id = session.open("evora.pdf", None, Arc::new(bytes.to_vec()), None).ok()?;
     Some((session, id))
@@ -107,22 +107,22 @@ fn field_value(bytes: &[u8], name: &str) -> Option<String> {
 }
 
 /// The text of the Add text box open on page 1, if any.
-fn draft_text(h: &Harness<'static, PdfCraftApp>) -> Option<String> {
+fn draft_text(h: &Harness<'static, EvoPdfApp>) -> Option<String> {
     h.state().views.first().and_then(|v| v.content.draft.as_ref()).map(|d| d.text.clone())
 }
 
 /// The text of the paragraph open for editing, if any.
-fn paragraph_text(h: &Harness<'static, PdfCraftApp>) -> Option<String> {
+fn paragraph_text(h: &Harness<'static, EvoPdfApp>) -> Option<String> {
     h.state().views.first().and_then(|v| v.line_editor.as_ref()).map(|ed| ed.text.clone())
 }
 
 /// The form field open for typing and its text, if any.
-fn field_typing(h: &Harness<'static, PdfCraftApp>) -> Option<(String, String)> {
+fn field_typing(h: &Harness<'static, EvoPdfApp>) -> Option<(String, String)> {
     h.state().views.first().and_then(|v| v.forms.focus.as_ref()).map(|f| (f.name.clone(), f.text.clone()))
 }
 
 /// The texts added to the document (committed), in order.
-fn added_texts(h: &Harness<'static, PdfCraftApp>) -> Vec<String> {
+fn added_texts(h: &Harness<'static, EvoPdfApp>) -> Vec<String> {
     let app = h.state();
     let Some(doc) = app.views.first().and_then(|v| app.session.get(v.id)) else { return Vec::new() };
     doc.added()
@@ -273,10 +273,10 @@ fn add_and_save(s: &str) -> Result<Vec<u8>, String> {
     session.save_bytes(id).map(|b| b.to_vec()).map_err(|e| e.to_string())
 }
 
-/// What `bytes` hold: a full font program embedded by `pdfcraft_fonts::embedding` (its streams carry
+/// What `bytes` hold: a full font program embedded by `evopdf_fonts::embedding` (its streams carry
 /// `/PCFullFont`), and the number of image streams.
 fn embedded_and_images(bytes: &[u8]) -> (bool, usize) {
-    let Ok(doc) = pdfcraft_cos::Document::open(Arc::new(bytes.to_vec())) else { return (false, usize::MAX) };
+    let Ok(doc) = evopdf_cos::Document::open(Arc::new(bytes.to_vec())) else { return (false, usize::MAX) };
     let mut embedded = false;
     let mut images = 0;
     for (_, object) in doc.scan_objects() {
@@ -292,7 +292,7 @@ fn embedded_and_images(bytes: &[u8]) -> (bool, usize) {
 fn added_text_beyond_western_europe_is_real_text() {
     let mut v = Verdict::new("unicode");
     for (i, s) in ["Pāpeʻete Māʻohi", "Zażółć", "Привет", "Ωμέγα", "Tiếng Việt"].into_iter().enumerate() {
-        let refused = pdfcraft_engine::first_undrawable(&added(s));
+        let refused = evopdf_engine::first_undrawable(&added(s));
         v.holds(refused.is_none(), || format!("« {s} » : refusé à la saisie (caractère {refused:?})"));
         match add_and_save(s) {
             Ok(bytes) => {
@@ -308,7 +308,7 @@ fn added_text_beyond_western_europe_is_real_text() {
         }
     }
     // Witness: what Inter doesn't cover stays refused.
-    let refused = pdfcraft_engine::first_undrawable(&added("中文"));
+    let refused = evopdf_engine::first_undrawable(&added("中文"));
     v.holds(refused == Some('中') && add_and_save("中文").is_err(), || format!("« 中文 » : refus attendu (caractère {refused:?})"));
     // Twin: Western European text keeps the standard font, nothing embedded.
     match add_and_save("Café crème") {
@@ -326,7 +326,7 @@ fn added_text_beyond_western_europe_is_real_text() {
 /// Every entry of a page's `/Resources /Font` in `bytes`: its name, and whether it is an indirect
 /// object (a font written straight into the dictionary sends Poppler looking up a made-up number).
 fn page_fonts(bytes: &[u8]) -> Vec<(String, bool)> {
-    let Ok(doc) = pdfcraft_cos::Document::open(Arc::new(bytes.to_vec())) else { return Vec::new() };
+    let Ok(doc) = evopdf_cos::Document::open(Arc::new(bytes.to_vec())) else { return Vec::new() };
     let mut out = Vec::new();
     for (_, object) in doc.scan_objects() {
         let Object::Dict(d) = &*object else { continue };

@@ -1,0 +1,22 @@
+[package]
+name = "evo-quit"
+description = "Quit a Evo app the platform's own way: on macOS through `-[NSApplication terminate:]`."
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+rust-version = "1.95"
+repository = "vendor/evo-libs"
+
+[features]
+egui = ["dep:egui"]
+menu = ["egui", "dep:muda"]
+
+[dependencies]
+egui = { version = "0.36", default-features = false, optional = true }
+
+[target."cfg(target_os = \"macos\")".dependencies]
+dispatch2 = { version = "0.3.1", default-features = false, features = ["std"] }
+objc2 = { version = "0.6.4", default-features = false, features = ["std"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSApplication", "NSResponder"] }
+muda = { version = "0.21.2", default-features = false, optional = true }
+

@@ -2,10 +2,10 @@
 //! another app's list).
 
 use egui::{Align2, CornerRadius, Rect, Sense, Stroke, vec2};
-use pdfcraft_engine::catalog;
+use evopdf_engine::catalog;
 
 use crate::theme::{self, Tokens};
-use crate::{PdfCraftApp, icons, panels::human_size, widgets};
+use crate::{EvoPdfApp, icons, panels::human_size, widgets};
 
 const RECOMMENDED: [&str; 5] = ["organize", "comment", "form", "edit", "protect"];
 
@@ -18,17 +18,17 @@ pub(crate) fn card_lift(ui: &egui::Ui, t: &Tokens, rect: Rect, press: theme::Pre
     }
 }
 
-pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
+pub fn show(app: &mut EvoPdfApp, ui: &mut egui::Ui) {
     let t = Tokens::get(ui.ctx());
     egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         egui::Frame::NONE.inner_margin(egui::Margin { left: 36, right: 36, top: 28, bottom: 28 }).show(ui, |ui| {
-            ui.label(egui::RichText::new(tl!("Welcome to PdfCraft")).font(theme::semibold(24.0)));
+            ui.label(egui::RichText::new(tl!("Welcome to EvoPdf")).font(theme::semibold(24.0)));
             ui.label(
                 egui::RichText::new(tl!("An open-source PDF workbench — local, private, and scriptable."))
                     .color(t.text_muted)
                     .font(theme::regular(14.0)),
             );
-            // Evora (E1): the ArtCraft community card (mark, Discord) is removed.
+            // Evora (E1): the Upstream community card (mark, Discord) is removed.
             ui.add_space(22.0);
 
             egui::Frame::NONE
@@ -125,7 +125,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
             ui.add_space(20.0);
             widgets::section_title(ui, tl!("Privacy"));
             ui.label(
-                egui::RichText::new(tl!("PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider."))
+                egui::RichText::new(tl!("EvoPdf works offline. No telemetry, no account, and no cloud processing unless you add a provider."))
                     .color(t.text_muted),
             );
         });
@@ -134,7 +134,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
 
 /// Home's Recent section: the files opened before, one row each, with Clear and a remove button.
 /// Evora (Q47 (a)): not drawn, the engine's own recent files being hidden.
-fn recent(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
+fn recent(app: &mut EvoPdfApp, ui: &mut egui::Ui, t: &Tokens) {
     ui.add_space(26.0);
     let mut clear = false;
     ui.horizontal(|ui| {
@@ -149,7 +149,7 @@ fn recent(app: &mut PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
     });
     ui.add_space(8.0);
     if app.recent.is_empty() {
-        ui.label(egui::RichText::new(tl!("Files you open in PdfCraft appear here. Drop a PDF anywhere to open it.")).color(t.text_muted));
+        ui.label(egui::RichText::new(tl!("Files you open in EvoPdf appear here. Drop a PDF anywhere to open it.")).color(t.text_muted));
     }
     let mut open = None;
     let mut remove = None;
@@ -224,7 +224,7 @@ mod tests {
         crate::i18n::set_current(de);
         let ctx = egui::Context::default();
         ctx.set_fonts(theme::font_definitions());
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         let blurb = catalog::group("form")
             .unwrap()
             .sections

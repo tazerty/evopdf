@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Portes Evora sur le site web empaqueté (écrit pour le fork tazerty/pdfcraft, stdlib seule).
+"""Portes Evora sur le site web empaqueté (écrit pour le fork tazerty/evopdf, stdlib seule).
 
 Sous-commandes :
   check PKG REPO REPORT      portes des marques (E1), des fichiers d'hébergement, des émojis (E10) et
@@ -7,7 +7,7 @@ Sous-commandes :
   csp PKG OUT                empreintes sha256-… des scripts inline d'index.html (CSP), une par ligne.
   compress PKG               fichiers .br (brotli -q 11) et .gz (gzip -9 -n) à côté de chaque ressource web.
   sizes PKG REPORT           tailles (.wasm brut, .br, .gz ; site complet).
-  fonts CRAFT_DIR REPORT     polices craft-fonts embarquées dans le build web (E6, mesure).
+  fonts EVO_DIR REPORT     polices evo-fonts embarquées dans le build web (E6, mesure).
   deny-config UPSTREAM EVORA OUT REPORT
                              configuration de la porte cargo-deny : deny.toml de l'amont, inchangé,
                              plus les exceptions d'avis nommées par Evora (EVORA ; preuve : chaque
@@ -35,16 +35,18 @@ import subprocess
 import sys
 import unicodedata
 
-# Marques ArtCraft (E1) : recherche insensible à la casse, octet par octet, .wasm compris.
-# « discord » seul (depuis EVORA-COL-21) : le nom du serveur communautaire ArtCraft, même sans URL
+# Marques amont (E1) : recherche insensible à la casse, octet par octet, .wasm compris.
+# « discord » seul (depuis EVORA-COL-21) : le nom du serveur communautaire amont, même sans URL
 # (une mesure de largeur « Discord » de la barre d'onglets survivait au retrait du bouton).
-BRANDS = ("artcraft", "discord.gg", "getartcraft", "discord")
+# Le nom amont retiré n'est jamais écrit en clair dans le dépôt : il est reconstitué ici.
+BRAND = "artc" "raft"
+BRANDS = (BRAND, "discord.gg", "getartc" "raft", "discord")
 # Fichiers d'hébergement interdits dans l'artefact : l'hébergement est celui d'Evora.
 HOSTING_NAMES = {".htaccess", "_headers", "_redirects", "web.config", ".user.ini"}
 HOSTING_SUFFIXES = (".conf", ".php")
 # Ressources servies au navigateur, précompressées.
 WEB_SUFFIXES = (".wasm", ".js", ".html", ".css", ".svg", ".json", ".map")
-# Dossier où les mentions de licence (dont « basé sur PdfCraft par l'équipe ArtCraft ») sont permises.
+# Dossier où les mentions de licence (dont celle du projet d'origine) sont permises.
 LICENCES_DIR = "LICENSES"
 
 # Catalogues affichés (E10) : catalogues TSV et chaînes du code d'interface.
@@ -53,9 +55,9 @@ CATALOG_DIR = "crates/ui-egui/src/i18n"
 SENSITIVE = ("Lumetri", "Lightroom", "Acrobat", "Premiere", "Adobe", "Cycore")
 OVERRIDES = "crates/ui-egui/src/i18n/evora-overrides.txt"
 # Chaînes anglaises affichées (par tl!/tr, ou brutes pour les messages du moteur).
-E9_SOURCE_DIRS = (("crates/ui-egui/src", False), ("apps/pdfcraft-web/src", False), ("crates/engine/src", True))
+E9_SOURCE_DIRS = (("crates/ui-egui/src", False), ("apps/evopdf-web/src", False), ("crates/engine/src", True))
 STRING_LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"')
-UI_SOURCE_DIRS = ("crates/ui-egui/src", "crates/engine/src", "apps/pdfcraft-web/src")
+UI_SOURCE_DIRS = ("crates/ui-egui/src", "crates/engine/src", "apps/evopdf-web/src")
 E10_BASELINE = ".github/evora/e10-baseline.txt"
 
 
@@ -109,19 +111,19 @@ def check_brands(pkg, report):
         if any(counts.values()):
             log(report, f"| `{r}` | " + " | ".join(str(counts[b]) for b in BRANDS) + " |")
         if r.split("/", 1)[0] == LICENCES_DIR:
-            licences += counts["artcraft"]
+            licences += counts[BRAND]
         else:
             for b in BRANDS:
                 site[b] += counts[b]
     log(report)
     log(report, f"Hors {LICENCES_DIR}/ : " + ", ".join(f"{b} **{site[b]}**" for b in BRANDS)
-                + f" (attendu : 0) ; dans {LICENCES_DIR}/ (permis) : artcraft {licences}")
+                + f" (attendu : 0) ; dans {LICENCES_DIR}/ (permis) : nom amont {licences}")
     log(report)
     ok = not any(site.values())
     print("::notice::marques hors LICENSES : " + " ".join(f"{b}={site[b]}" for b in BRANDS)
-          + f" ; LICENSES artcraft={licences}")
+          + f" ; LICENSES nom amont={licences}")
     if not ok:
-        print("::error::marque ArtCraft présente dans le bundle (porte E1)")
+        print("::error::marque amont présente dans le bundle (porte E1)")
     return ok
 
 
@@ -500,21 +502,21 @@ def cmd_sizes(pkg, report_path):
 BARRED_FAMILIES = ("Source Han", "Source Serif", "Source Sans", "Noto Sans CJK", "Noto Serif CJK")
 
 
-def cmd_fonts(craft_dir, report_path):
-    """E6 : polices craft-fonts embarquées dans le build web et polices laissées de côté (mesure)."""
+def cmd_fonts(evo_dir, report_path):
+    """E6 : polices evo-fonts embarquées dans le build web et polices laissées de côté (mesure)."""
     embedded, left, barred = [], [], []
-    with open(os.path.join(craft_dir, "fonts", "manifest.txt"), encoding="utf-8") as fh:
+    with open(os.path.join(evo_dir, "fonts", "manifest.txt"), encoding="utf-8") as fh:
         for line in fh:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             cols = [c.strip() for c in line.split(" | ")]
             if len(cols) < 4:
-                print(f"::error::ligne de manifeste craft-fonts illisible : {line}")
+                print(f"::error::ligne de manifeste evo-fonts illisible : {line}")
                 return 1
             family, style, file, scripts = cols[:4]
             scripts = [x.strip() for x in scripts.split(",")]
-            size = os.path.getsize(os.path.join(craft_dir, file)) if os.path.exists(os.path.join(craft_dir, file)) else 0
+            size = os.path.getsize(os.path.join(evo_dir, file)) if os.path.exists(os.path.join(evo_dir, file)) else 0
             row = (family, style, ",".join(scripts), size)
             if any(family.startswith(b) for b in BARRED_FAMILIES):
                 barred.append(row)
@@ -523,7 +525,7 @@ def cmd_fonts(craft_dir, report_path):
             else:
                 left.append(row)
     with open(report_path, "a", encoding="utf-8") as report:
-        log(report, "### Polices craft-fonts (E6, mesure)")
+        log(report, "### Polices evo-fonts (E6, mesure)")
         log(report)
         log(report, "| Face embarquée dans le .wasm | Écritures | Octets |")
         log(report, "|---|---|---|")
@@ -534,15 +536,15 @@ def cmd_fonts(craft_dir, report_path):
                     f"crates/fonts/build.rs : {len(left)} faces, {sum(r[3] for r in left)} octets ; écartées par AGENTS.md §1.1 "
                     f"de l'amont : {len(barred)} faces.")
         log(report)
-    print(f"::notice::craft-fonts embarquées : {len(embedded)} faces, {sum(r[3] for r in embedded)} octets")
+    print(f"::notice::evo-fonts embarquées : {len(embedded)} faces, {sum(r[3] for r in embedded)} octets")
     return 0 if embedded else 1
 
 
 def web_graph_packages():
-    """Noms des paquets du graphe du build web (pdfcraft-web, cible wasm32, dépendances normales et de
+    """Noms des paquets du graphe du build web (evopdf-web, cible wasm32, dépendances normales et de
     compilation, hôte compris), par `cargo tree`, hors ligne et verrou tenu."""
     out = subprocess.run(
-        ["cargo", "tree", "--locked", "--offline", "-p", "pdfcraft-web", "--target", "wasm32-unknown-unknown",
+        ["cargo", "tree", "--locked", "--offline", "-p", "evopdf-web", "--target", "wasm32-unknown-unknown",
          "-e", "normal,build", "--prefix", "none", "--format", "{p}"],
         check=True, capture_output=True, text=True).stdout
     return {line.split()[0] for line in out.splitlines() if line.strip()}
@@ -564,7 +566,7 @@ def cmd_deny_config(upstream, evora, out_path, report_path):
     graph = web_graph_packages()
     problems = []
     # Témoin de l'instrument : la crate web et egui sont dans le graphe, sinon il ne dit rien.
-    for known in ("pdfcraft-web", "egui"):
+    for known in ("evopdf-web", "egui"):
         if known not in graph:
             problems.append(f"instrument : {known} absent du graphe web relevé par cargo tree ({len(graph)} paquets)")
     for e in added:
@@ -626,7 +628,7 @@ def cmd_deny_config(upstream, evora, out_path, report_path):
     return 1 if problems else 0
 
 
-# Témoins sabordés des masquages (fonctionnalités CI de pdfcraft-ui-egui, jamais dans le build web). Pour
+# Témoins sabordés des masquages (fonctionnalités CI de evopdf-ui-egui, jamais dans le build web). Pour
 # chacun : le début de libellé de ses seuls détecteurs dans tests/evora_masks.rs, les familles qui doivent
 # rougir sous lui (toutes les autres restent vertes) et, quand ses détecteurs nomment un groupe d'outils,
 # la liste exacte des groupes proposés attendue par famille (une faute par recherche).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test de fumée Evora : le build web chargé dans une iframe servie par une AUTRE origine.
 
-Écrit pour le fork tazerty/pdfcraft ; bibliothèque standard Python seule, aucune action tierce.
+Écrit pour le fork tazerty/evopdf ; bibliothèque standard Python seule, aucune action tierce.
 Chrome (préinstallé sur le runner) est piloté par le protocole DevTools sur tuyaux
 (--remote-debugging-pipe : commandes JSON terminées par un octet nul sur les descripteurs 3 et 4).
 
@@ -88,7 +88,7 @@ l'origine A (même stockage que le moteur, il lit le localStorage à l'arrivée 
 d'evora:init et d'evora:purge) et une page intruse d'une TROISIÈME origine (http://localhost:<port C>,
 non admise par evora-host.json) qui envoie au moteur des messages EHP bien formés.
 
-Succès d'un scénario : le canvas #pdfcraft existe et eframe l'a dimensionné (largeur = largeur CSS ×
+Succès d'un scénario : le canvas #evopdf existe et eframe l'a dimensionné (largeur = largeur CSS ×
 devicePixelRatio, différente des 300 px par défaut), son contexte WebGL2 est vivant, et ni la page
 parente ni l'iframe ne remontent d'exception, d'erreur de console ou d'erreur de journal
 (chargement, CSP…). Le démarrage à froid mesuré va de la navigation de l'iframe au premier
@@ -126,9 +126,9 @@ PARENT_ORIGIN = f"http://localhost:{PORT_B}"
 INTRUDER_ORIGIN = f"http://localhost:{PORT_C}"
 # E5 : espaces de noms (storageNs, 64 hexa) du compte courant et de deux autres comptes.
 NS_OWN, NS_OTHER, NS_OTHER2 = "ab" * 32, "cd" * 32, "ef" * 32
-NS_PREFIX = "evora.pdfcraft."
+NS_PREFIX = "evora.evopdf."
 # Clés que le moteur écrit hors espace de noms sur son origine (amont, ancien nom, mémoire d'eframe).
-LOOSE_KEYS = ("pdfcraft", "printcraft", "egui_memory_ron")
+LOOSE_KEYS = ("evopdf", "evoprint", "egui_memory_ron")
 # Clé qui n'appartient pas au moteur (une autre app de l'origine, en mode A) : aucune purge n'y touche.
 WITNESS_KEY = "evora-witness"
 # Ids ULID des messages de la page intruse (préfixe distinct de ceux de la page parente).
@@ -623,14 +623,14 @@ TIMING = """(() => {
   const mark = (k) => { if (!(k in T)) T[k] = performance.now(); };
   const watch = (c) => new MutationObserver(() => { if (c.width !== 300) mark('canvasSized'); })
     .observe(c, {attributes: true, attributeFilter: ['width']});
-  const find = () => { const c = document.getElementById('pdfcraft'); if (c) { watch(c); return true; } return false; };
+  const find = () => { const c = document.getElementById('evopdf'); if (c) { watch(c); return true; } return false; };
   if (!find()) new MutationObserver((_, o) => { if (find()) o.disconnect(); })
     .observe(document, {childList: true, subtree: true});
   addEventListener('TrunkApplicationStarted', () => mark('trunkStarted'));
 })()"""
 
 PROBE = """(() => {
-  const c = document.getElementById('pdfcraft');
+  const c = document.getElementById('evopdf');
   if (!c) return JSON.stringify({canvas: false, t: performance.now()});
   const dpr = window.devicePixelRatio || 1;
   return JSON.stringify({canvas: true, w: c.width, h: c.height, cw: c.clientWidth, ch: c.clientHeight,
@@ -638,7 +638,7 @@ PROBE = """(() => {
 })()"""
 
 GL_PROBE = """(() => {
-  const c = document.getElementById('pdfcraft');
+  const c = document.getElementById('evopdf');
   if (!c) return 'no-canvas';
   const gl = c.getContext('webgl2');
   return gl ? (gl.isContextLost() ? 'lost' : 'webgl2') : 'other';
@@ -777,8 +777,8 @@ def run_scenario(name, site, csp, out_dir, chrome_bin, query=ENGINE_QUERY, expec
             # les clés de l'amont ne sont pas purgés au démarrage : seuls evora:init et evora:purge,
             # sous le pont, effacent quelque chose.
             _, _, sess0, ctx0 = ready
-            seed = ("localStorage.setItem('pdfcraft', JSON.stringify({language: 'en', reload_changed_files: false}));"
-                    "localStorage.setItem('printcraft', '{}'); 'ok'")
+            seed = ("localStorage.setItem('evopdf', JSON.stringify({language: 'en', reload_changed_files: false}));"
+                    "localStorage.setItem('evoprint', '{}'); 'ok'")
             chrome.call("Runtime.evaluate", {"expression": seed, "contextId": ctx0, "returnByValue": True}, sess0)
             stale = set(k for k, o in contexts.items() if o == ENGINE_ORIGIN)
             chrome.send("Runtime.evaluate", {"expression": "location.reload()", "contextId": ctx0}, sess0)
@@ -788,7 +788,7 @@ def run_scenario(name, site, csp, out_dir, chrome_bin, query=ENGINE_QUERY, expec
                 keys = chrome.call("Runtime.evaluate", {"expression": "JSON.stringify(Object.keys(localStorage))",
                                                         "contextId": ctx1, "returnByValue": True}, sess1)
                 result["storage_keys"] = json.loads(keys.get("result", {}).get("value", "[]"))
-                missing = [k for k in ("pdfcraft", "printcraft") if k not in result["storage_keys"]]
+                missing = [k for k in ("evopdf", "evoprint") if k not in result["storage_keys"]]
                 if missing:
                     errors.append(f"[hors-pont] clés de l'amont effacées au démarrage sans pont (amont modifié) : {missing}")
         result["probe"] = probe
@@ -939,12 +939,12 @@ EARLY_DIRTY = ("(() => { window.parent.postMessage({v: 1, type: 'evora:dirty', i
 ENGINE_MSGS = "JSON.stringify((window.__evoraStoreLog || []).filter((op) => op.op === 'msg'))"
 
 # Focus réel du canvas (évalué comme un geste de l'utilisateur), puis l'événement que suit eframe.
-FOCUS = """(() => { const c = document.getElementById("pdfcraft"); c.focus();
+FOCUS = """(() => { const c = document.getElementById("evopdf"); c.focus();
   c.dispatchEvent(new FocusEvent("focus")); return document.activeElement === c; })()"""
 # Perte de focus : eframe enregistre alors l'état de l'app (App::save).
-BLUR = """(() => { const c = document.getElementById("pdfcraft"); c.blur();
+BLUR = """(() => { const c = document.getElementById("evopdf"); c.blur();
   c.dispatchEvent(new FocusEvent("blur")); return document.activeElement !== c; })()"""
-KEY = """(() => { const c = document.getElementById("pdfcraft");
+KEY = """(() => { const c = document.getElementById("evopdf");
   c.dispatchEvent(new KeyboardEvent("%(type)s", {key: "s", code: "KeyS", ctrlKey: %(ctrl)s, bubbles: true, cancelable: true}));
   return document.activeElement === c; })()"""
 
@@ -1039,7 +1039,7 @@ def detector_selftest():
                 and frames_between(msgs[:2], "x evora:init", "x evora:open") is None)
     return (dirty_ok and writes_after(late, purge) == ["k"] and writes_after(benign, purge) == []
             and leftovers([own, WITNESS_KEY], [own]) == [own] and leftovers([WITNESS_KEY], [own]) == []
-            and engine_keys([WITNESS_KEY, "pdfcraft", own]) == sorted(["pdfcraft", own]))
+            and engine_keys([WITNESS_KEY, "evopdf", own]) == sorted(["evopdf", own]))
 
 
 def run_ehp(chrome, page, engine, contexts, result, errors, sabotage=""):
@@ -1127,7 +1127,7 @@ def run_ehp(chrome, page, engine, contexts, result, errors, sabotage=""):
         store["instrument"] = in_engine(STORE_HOOK % {"sabotage": sabotage})
         seeds = [[other, json.dumps({"language": "ja", "author": "Autre compte"})],
                  [own, json.dumps({"reload_changed_files": False, "author": "Ancien nom", "language": "ja"})],
-                 ["pdfcraft", json.dumps({"language": "ja", "author": "Compte précédent"})], ["printcraft", "{}"],
+                 ["evopdf", json.dumps({"language": "ja", "author": "Compte précédent"})], ["evoprint", "{}"],
                  ["egui_memory_ron", "()"], [WITNESS_KEY, "1"]]
         store["seme"] = in_engine(SEED % json.dumps(seeds))
         # 3. evora:init de version 2 (à ignorer), puis evora:init valide (storageNs du compte courant).
@@ -1242,7 +1242,7 @@ def run_ehp(chrome, page, engine, contexts, result, errors, sabotage=""):
         if late:
             errors.append(f"[ecritures] écritures du moteur après la réception d'evora:purge : {late}")
         # 10. evora:purge {scope: "all"} : un autre espace et une clé hors espace, semés par le banc.
-        in_engine(SEED % json.dumps([[other2, "{}"], ["pdfcraft", "{}"]]))
+        in_engine(SEED % json.dumps([[other2, "{}"], ["evopdf", "{}"]]))
         evaluate("window.__evoraSend('purgeAll', 'evora:purge', {scope: 'all'})", page)
         st = wait(lambda s: acks(s, "purgeAll") and observed(s, "purgeAll") is not None, 15)
         check_purge("all", "purgeAll", st)
@@ -1879,7 +1879,7 @@ ROB_ENC_PROBE = "evora-chiffre"
 ROB_LOCAL_NAME = "evora-depose.pdf"
 ROB_LOCAL_PROBE = "evora-depose"
 # Mot de passe utilisateur du PDF chiffré du banc ; le moteur le saisit sur ROB_PASSWORD_COMMAND
-# (PROBE_PASSWORD_VALUE d'apps/pdfcraft-web/src/main.rs). Une donnée d'essai, pas un secret.
+# (PROBE_PASSWORD_VALUE d'apps/evopdf-web/src/main.rs). Une donnée d'essai, pas un secret.
 ROB_PASSWORD = b"evora-smoke"
 ROB_PASSWORD_COMMAND = "evora-ci.password"
 ROB_FIX_EXPECTED = {"rob-chiffre-depot"}
@@ -1967,7 +1967,7 @@ ROB_NO_REMOVE = """((key) => {
 })(%s)"""
 # Un fichier local déposé sur le canevas, comme un glisser-déposer depuis l'ordinateur.
 ROB_DROP = """((b64, name) => {
-  const c = document.getElementById("pdfcraft");
+  const c = document.getElementById("evopdf");
   if (!c) return -1;
   const bytes = Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
   const dt = new DataTransfer();
@@ -2474,7 +2474,7 @@ FIN_EARLY = """(() => {
   } finally { bench = false; }
   return "posé";
 })()"""
-FIN_F6 = """((shift) => { const c = document.getElementById("pdfcraft");
+FIN_F6 = """((shift) => { const c = document.getElementById("evopdf");
   for (const type of ["keydown", "keyup"]) {
     c.dispatchEvent(new KeyboardEvent(type, {key: "F6", code: "F6", shiftKey: shift, bubbles: true, cancelable: true}));
   }
@@ -3079,7 +3079,7 @@ def error_tags(errors):
 
 # Événement de pointeur synthétique dans le document moteur, au point (x, y) en pixels CSS du cadre : ceux que le
 # lanceur web d'eframe écoute sur le canvas (survol, appui et relâchement du bouton principal).
-MENU_POINTER = """((x, y, type, buttons) => { const c = document.getElementById("pdfcraft");
+MENU_POINTER = """((x, y, type, buttons) => { const c = document.getElementById("evopdf");
   const o = {clientX: x, clientY: y, bubbles: true, cancelable: true, composed: true, button: 0, buttons: buttons,
              pointerId: 1, pointerType: "mouse", isPrimary: true};
   c.dispatchEvent(type === "mousemove" ? new MouseEvent(type, o) : new PointerEvent(type, o));

@@ -4,10 +4,10 @@
 //! sheets. Printing sends the print-ready PDF to the system spooler; "Save as PDF" writes it.
 
 use egui::{Color32, Pos2, Rect, Stroke, pos2, vec2};
-use pdfcraft_engine::print::{self, Binding, BookletSubset, Content, Layout, Orientation, PAPERS, PageOrder, SizeMode, Subset, spool};
+use evopdf_engine::print::{self, Binding, BookletSubset, Content, Layout, Orientation, PAPERS, PageOrder, SizeMode, Subset, spool};
 
 use crate::theme::{self, Tokens};
-use crate::{PdfCraftApp, widgets};
+use crate::{EvoPdfApp, widgets};
 
 /// The preview pane, and the paper inside it (12 pt inset on each side).
 const PREVIEW_W: f32 = 320.0;
@@ -92,7 +92,7 @@ pub struct PrintDraft {
     /// Label: turn a further 180°.
     pub label_flip: bool,
     /// Label: each page's printed area and text direction, read when Label is chosen
-    /// ([`PdfCraftApp::read_label_crops`]); empty until then.
+    /// ([`EvoPdfApp::read_label_crops`]); empty until then.
     pub crops: Vec<Option<print::Crop>>,
     /// The pages `crops` were read for, so a changed page selection reads them again.
     pub crop_pages: Option<Vec<usize>>,
@@ -255,7 +255,7 @@ impl PrintDraft {
     }
 }
 
-/// Lists the printers off the UI thread (the desktop app sets [`PdfCraftApp::printer_source`]):
+/// Lists the printers off the UI thread (the desktop app sets [`EvoPdfApp::printer_source`]):
 /// on Windows each driver's capabilities are read for its two-sided support, and CUPS' driverless discovery can wait on
 /// the network. Without a source the dialog reads them as it opens, so tests stay deterministic.
 pub type PrinterSource = std::sync::Arc<dyn Fn() -> Vec<spool::Printer> + Send + Sync>;
@@ -346,7 +346,7 @@ fn offered(printer: Option<&str>, printers: &[spool::Printer]) -> bool {
     printer.is_none_or(|name| printers.iter().any(|p| p.name == name))
 }
 
-/// Asks for a frame when a worker thread ends, also when it panics: [`PdfCraftApp::poll_print`]
+/// Asks for a frame when a worker thread ends, also when it panics: [`EvoPdfApp::poll_print`]
 /// then sees the answer, or the disconnected channel of a worker that died, without waiting
 /// for some other event to draw (#2108 review). Declared before the worker's sender, so the
 /// sender is dropped first and the frame finds the channel closed.
@@ -362,7 +362,7 @@ impl Drop for WakeOnExit {
     }
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     pub fn open_print(&mut self) {
         let Some((i, _)) = self.active_ids() else { return };
         let (printers, printers_loading) = match self.printer_source.clone() {
@@ -408,7 +408,7 @@ impl PdfCraftApp {
     /// Label printing: find each printed page's printed area (a quick low-resolution render, as
     /// Fit Visible does) and which way its text runs. Only the pages being printed are read, at
     /// most [`LABEL_CROP_PAGES`] of them (the rest print whole); read again when they change.
-    pub(crate) fn read_label_crops(&mut self, id: pdfcraft_engine::DocId) {
+    pub(crate) fn read_label_crops(&mut self, id: evopdf_engine::DocId) {
         let Some(doc) = self.session.get(id) else { return };
         let labels: Vec<String> = doc.info.pages.iter().map(|p| p.label.clone()).collect();
         let mut pages = self.print_draft.settings(doc.info.pages.len(), &labels).map(|s| s.pages).unwrap_or_default();
@@ -419,8 +419,8 @@ impl PdfCraftApp {
             return;
         }
         let up = self.session.print_text_up(id, &pages);
-        let config = pdfcraft_render::RenderConfig { password: doc.password.as_deref().map(std::sync::Arc::from), ..Default::default() };
-        let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), config);
+        let config = evopdf_render::RenderConfig { password: doc.password.as_deref().map(std::sync::Arc::from), ..Default::default() };
+        let mut r = evopdf_render::PageRenderer::new(doc.bytes.clone(), config);
         self.print_draft.crops = doc
             .info
             .pages
@@ -431,9 +431,9 @@ impl PdfCraftApp {
                 if pages.binary_search(&page).is_err() || w <= 0.0 || h <= 0.0 {
                     return None;
                 }
-                let out = r.render(pdfcraft_render::RenderRequest {
+                let out = r.render(evopdf_render::RenderRequest {
                     page,
-                    kind: pdfcraft_render::RequestKind::Pixels,
+                    kind: evopdf_render::RequestKind::Pixels,
                     tile: None,
                     scale: (1000.0 / w.max(h) as f32).clamp(0.1, 4.0),
                     tag: 0,
@@ -695,7 +695,7 @@ impl PdfCraftApp {
     }
 
     /// Print through the browser's print dialog: start drawing `sheets` (the pages of the
-    /// print-ready `bytes`), a sheet a frame in [`PdfCraftApp::poll_print`]. A print still being
+    /// print-ready `bytes`), a sheet a frame in [`EvoPdfApp::poll_print`]. A print still being
     /// prepared is replaced. The dialog closes at once.
     #[cfg(target_arch = "wasm32")]
     fn print_in_browser(&mut self, name: String, bytes: Vec<u8>, sheets: Vec<(f64, f64)>) -> bool {
@@ -1007,7 +1007,7 @@ pub(crate) fn body(
                 }
                 ui.end_row();
                 // The spooler answered with no printer at all (#160): say so, rather than
-                // leaving Save as PDF looking like the only thing PdfCraft can do.
+                // leaving Save as PDF looking like the only thing EvoPdf can do.
                 if !d.printers_loading && d.printers.is_empty() {
                     ui.label("");
                     ui.label(
@@ -1446,7 +1446,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn the_progress_card_counts_the_sheets_of_a_print_job() {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         let (tx, rx) = std::sync::mpsc::channel();
         app.print_tasks.jobs.push(PrintJob { printer: "Office".into(), sheets: None, news: rx });

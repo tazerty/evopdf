@@ -1,4 +1,4 @@
-//! pdfcraft-js — Acrobat JavaScript for forms (L3).
+//! evopdf-js — Acrobat JavaScript for forms (L3).
 //!
 //! Field scripts (format, keystroke, validate, calculate), button actions and document-level
 //! scripts run in [boa](https://boajs.dev), a JavaScript engine written in Rust, with the subset
@@ -157,7 +157,7 @@ pub enum Request {
     /// `this.pageNum = n` (0-based).
     GoToPage(usize),
     LaunchUrl(String),
-    /// `this.submitForm(url)`: never sent on PdfCraft's own.
+    /// `this.submitForm(url)`: never sent on EvoPdf's own.
     Submit(String),
     /// `field.setFocus()`.
     Focus(String),
@@ -1617,7 +1617,7 @@ pub fn run_shared(script: &str, event: &Event, doc: &DocInfo, fields: Arc<Vec<Fi
     {
         std::thread::scope(|scope| {
             let spawned = std::thread::Builder::new()
-                .name("pdfcraft-js".into())
+                .name("evopdf-js".into())
                 .stack_size(SCRIPT_STACK)
                 .spawn_scoped(scope, || run_here(script, event, doc, fields, kept, skipped, limits));
             match spawned {
@@ -1703,7 +1703,7 @@ fn run_here(
         install(&mut ctx)?;
         let ev = event_object(&mut ctx, event);
         ctx.register_global_property(js_string!("event"), ev.clone(), Attribute::all())?;
-        // One document script that throws (calling a method PdfCraft lacks, say) must not keep
+        // One document script that throws (calling a method EvoPdf lacks, say) must not keep
         // every field script in the form from running: what it defined before the error, and
         // the other scripts, stay available (#3940).
         for &(i, d) in doc_scripts {

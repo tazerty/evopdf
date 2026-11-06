@@ -7,9 +7,9 @@
 //! writer (step 2), one hit test (step 3), and press-time capture with cancel (step 4).
 
 use egui_kittest::Harness;
-use pdfcraft_engine::StampKind;
-use pdfcraft_ui_egui::comments::CommentTool;
-use pdfcraft_ui_egui::{PdfCraftApp, QuickTool, UnlockPrompt};
+use evopdf_engine::StampKind;
+use evopdf_ui_egui::comments::CommentTool;
+use evopdf_ui_egui::{EvoPdfApp, QuickTool, UnlockPrompt};
 
 use crate::support::input::{coalesced_click, double_click, one_frame, touch_drag, touch_tap};
 
@@ -95,9 +95,9 @@ fn checkbox_pdf() -> Vec<u8> {
 
 /// The app with `pdf` open at `zoom` percent and its first frames run. The left panel stays
 /// open only where a test places the page relative to the window's chrome.
-fn open(pdf: Vec<u8>, zoom: &'static str, left_open: bool) -> Harness<'static, PdfCraftApp> {
+fn open(pdf: Vec<u8>, zoom: &'static str, left_open: bool) -> Harness<'static, EvoPdfApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("test.pdf", None, pdf).unwrap();
         if !left_open {
@@ -112,30 +112,30 @@ fn open(pdf: Vec<u8>, zoom: &'static str, left_open: bool) -> Harness<'static, P
     h
 }
 
-fn stamp_tool(h: &mut Harness<'_, PdfCraftApp>) {
+fn stamp_tool(h: &mut Harness<'_, EvoPdfApp>) {
     h.state_mut().quick_tool = QuickTool::Stamp(StampKind::DynApproved);
     h.run_steps(4);
 }
 
-fn page(h: &Harness<'_, PdfCraftApp>) -> egui::Rect {
+fn page(h: &Harness<'_, EvoPdfApp>) -> egui::Rect {
     h.state().views[0].page_screen_rect(0).expect("page on screen")
 }
 
 /// The screen point at PDF (x, y) on the 300×400 page.
-fn at(h: &Harness<'_, PdfCraftApp>, x: f32, y: f32) -> egui::Pos2 {
+fn at(h: &Harness<'_, EvoPdfApp>, x: f32, y: f32) -> egui::Pos2 {
     let r = page(h);
     let k = r.width() / 300.0;
     r.min + egui::vec2(x * k, (400.0 - y) * k)
 }
 
-fn cursor_at(h: &mut Harness<'_, PdfCraftApp>, p: egui::Pos2) -> egui::CursorIcon {
+fn cursor_at(h: &mut Harness<'_, EvoPdfApp>, p: egui::Pos2) -> egui::CursorIcon {
     h.hover_at(p);
     h.run_steps(2);
     h.output().platform_output.cursor_icon
 }
 
 /// A mouse click: press and release in frames of their own, as `drag_at` and `drop_at` send them.
-fn mouse_click(h: &mut Harness<'_, PdfCraftApp>, p: egui::Pos2) {
+fn mouse_click(h: &mut Harness<'_, EvoPdfApp>, p: egui::Pos2) {
     h.hover_at(p);
     h.run_steps(1);
     h.drag_at(p);
@@ -145,7 +145,7 @@ fn mouse_click(h: &mut Harness<'_, PdfCraftApp>, p: egui::Pos2) {
 }
 
 /// A mouse drag from `from` by `by`, held over two frames on the way.
-fn mouse_drag(h: &mut Harness<'_, PdfCraftApp>, from: egui::Pos2, by: egui::Vec2) {
+fn mouse_drag(h: &mut Harness<'_, EvoPdfApp>, from: egui::Pos2, by: egui::Vec2) {
     h.hover_at(from);
     h.run_steps(1);
     h.drag_at(from);
@@ -158,24 +158,24 @@ fn mouse_drag(h: &mut Harness<'_, PdfCraftApp>, from: egui::Pos2, by: egui::Vec2
     }
 }
 
-fn stamps(h: &Harness<'_, PdfCraftApp>) -> usize {
+fn stamps(h: &Harness<'_, EvoPdfApp>) -> usize {
     let s = h.state();
     s.session.get(s.views[0].id).unwrap().info.annotations.iter().filter(|a| a.subtype == "Stamp").count()
 }
 
-fn square(h: &Harness<'_, PdfCraftApp>) -> Option<[f32; 4]> {
+fn square(h: &Harness<'_, EvoPdfApp>) -> Option<[f32; 4]> {
     let s = h.state();
     s.session.get(s.views[0].id).unwrap().info.annotations.iter().find(|a| a.subtype == "Square").map(|a| a.rect)
 }
 
-fn agree(h: &Harness<'_, PdfCraftApp>) -> Vec<String> {
+fn agree(h: &Harness<'_, EvoPdfApp>) -> Vec<String> {
     let s = h.state();
     s.session.get(s.views[0].id).unwrap().form.iter().find(|f| f.name == "agree").unwrap().value.clone()
 }
 
 /// Hovers `p` until `want` accepts the cursor there (text layers and paragraph boxes arrive from
 /// worker threads), and returns the last cursor seen.
-fn wait_for_cursor(h: &mut Harness<'_, PdfCraftApp>, p: egui::Pos2, want: impl Fn(egui::CursorIcon) -> bool) -> egui::CursorIcon {
+fn wait_for_cursor(h: &mut Harness<'_, EvoPdfApp>, p: egui::Pos2, want: impl Fn(egui::CursorIcon) -> bool) -> egui::CursorIcon {
     let mut cursor = egui::CursorIcon::Default;
     for _ in 0..50 {
         cursor = cursor_at(h, p);
@@ -385,7 +385,7 @@ fn a_dragged_panel_tab_passes_over_a_link_without_its_tip() {
     assert!(tip_shown(&h), "and shows its tip");
 }
 
-fn wheel(h: &mut Harness<'_, PdfCraftApp>, delta: egui::Vec2) {
+fn wheel(h: &mut Harness<'_, EvoPdfApp>, delta: egui::Vec2) {
     h.hover_at(egui::pos2(800.0, 500.0));
     h.event(egui::Event::MouseWheel { unit: egui::MouseWheelUnit::Point, delta, modifiers: egui::Modifiers::NONE, phase: egui::TouchPhase::Move });
     for _ in 0..10 {
@@ -427,13 +427,13 @@ fn stamp_cursor_stays_off_the_chrome_above_a_page_scrolled_under_it() {
 }
 
 /// Whether the page's hover tip was drawn in the last frame.
-fn tip_shown(h: &Harness<'_, PdfCraftApp>) -> bool {
+fn tip_shown(h: &Harness<'_, EvoPdfApp>) -> bool {
     let tip = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("canvas-hover"));
     h.ctx.memory(|m| m.areas().is_visible(&tip))
 }
 
 /// Opens the Unlock prompt, a dialog with a backdrop over the whole window, from the next frame.
-fn open_unlock_prompt(h: &mut Harness<'_, PdfCraftApp>) {
+fn open_unlock_prompt(h: &mut Harness<'_, EvoPdfApp>) {
     let doc = h.state().views[0].id;
     h.state_mut().unlock_prompt = Some(UnlockPrompt { doc, name: "test.pdf".into(), input: String::new(), error: None, then: None });
 }

@@ -1,6 +1,6 @@
 [package]
-name = "pdfcraft-engine"
-description = "PdfCraft engine façade: session, documents, command/tool catalogue"
+name = "evopdf-engine"
+description = "EvoPdf engine façade: session, documents, command/tool catalogue"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,35 +9,35 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-craft-docpath = { workspace = true }
-pdfcraft-measure = { workspace = true }
+evo-docpath = { workspace = true }
+evopdf-measure = { workspace = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
-pdfcraft-render = { workspace = true }
-pdfcraft-cos = { workspace = true }
-pdfcraft-organize = { workspace = true }
-pdfcraft-annot = { workspace = true }
-pdfcraft-forms = { workspace = true }
-pdfcraft-xfa = { workspace = true }
-pdfcraft-edit = { workspace = true }
-pdfcraft-audit = { workspace = true }
-pdfcraft-redact = { workspace = true }
-pdfcraft-print = { workspace = true }
-pdfcraft-xfdf = { workspace = true }
-pdfcraft-sign = { workspace = true }
-pdfcraft-optimize = { workspace = true }
-pdfcraft-a11y = { workspace = true }
-pdfcraft-ocr = { workspace = true }
-pdfcraft-js = { workspace = true }
-pdfcraft-compare = { workspace = true }
-pdfcraft-preflight = { workspace = true }
-pdfcraft-export = { workspace = true }
-pdfcraft-fonts = { workspace = true }
-pdfcraft-create = { workspace = true }
-pdfcraft-model = { workspace = true }
-pdfcraft-geom = { workspace = true }
+evopdf-render = { workspace = true }
+evopdf-cos = { workspace = true }
+evopdf-organize = { workspace = true }
+evopdf-annot = { workspace = true }
+evopdf-forms = { workspace = true }
+evopdf-xfa = { workspace = true }
+evopdf-edit = { workspace = true }
+evopdf-audit = { workspace = true }
+evopdf-redact = { workspace = true }
+evopdf-print = { workspace = true }
+evopdf-xfdf = { workspace = true }
+evopdf-sign = { workspace = true }
+evopdf-optimize = { workspace = true }
+evopdf-a11y = { workspace = true }
+evopdf-ocr = { workspace = true }
+evopdf-js = { workspace = true }
+evopdf-compare = { workspace = true }
+evopdf-preflight = { workspace = true }
+evopdf-export = { workspace = true }
+evopdf-fonts = { workspace = true }
+evopdf-create = { workspace = true }
+evopdf-model = { workspace = true }
+evopdf-geom = { workspace = true }
 thiserror = { workspace = true }
 png = "0.18"
-# Already in the graph (through image and pdfcraft-create): image's TiffEncoder can't set the
+# Already in the graph (through image and evopdf-create): image's TiffEncoder can't set the
 # resolution or the compression of an exported page.
 tiff = "0.11"
 # Already in the graph (url and idna through webbrowser, icu_properties through boa): they show
@@ -53,4 +53,4 @@ unicode-segmentation = "1.13"
 chrono = { workspace = true, features = ["clock"] }
 
 [dev-dependencies]
-pdfcraft-testkit = { workspace = true }
+evopdf-testkit = { workspace = true }

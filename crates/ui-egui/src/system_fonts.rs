@@ -1,12 +1,12 @@
 //! The last-resort interface font: one face already installed on this machine.
 //!
-//! The embedded faces (Inter, egui's defaults, craft-fonts) come first in every family; this one
+//! The embedded faces (Inter, egui's defaults, evo-fonts) come first in every family; this one
 //! only draws characters none of them has, such as an Arabic file name in a build without
-//! craft-fonts, or the Simplified Chinese interface in a build without a `Hans` face (#826). A
+//! evo-fonts, or the Simplified Chinese interface in a build without a `Hans` face (#826). A
 //! few more installed faces, [`devanagari_fallback`], [`telugu_fallback`], [`sinhala_fallback`],
 //! [`tamil_fallback`], [`hebrew_fallback`] and [`hangul_fallback`], draw Hindi, Telugu, Sinhala,
 //! Tamil, Hebrew and Korean when one is installed. It is read at runtime and never embedded or
-//! shipped (AGENTS.md §1.4), and `PDFCRAFT_SYSTEM_FONTS=0` turns it off (published screenshots do).
+//! shipped (AGENTS.md §1.4), and `EVOPDF_SYSTEM_FONTS=0` turns it off (published screenshots do).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock};
@@ -37,15 +37,15 @@ const HEBREW_PROBE: char = '\u{05D0}';
 /// Hangul syllable hih (힣, U+D7A3), the last of the 11,172 modern syllables: a face with it has
 /// the whole block. Droid Sans Fallback, for one, has 가 but few other syllables.
 const HANGUL_PROBE: char = '\u{D7A3}';
-/// 欢 (U+6B22): Simplified only, absent from the Japanese craft-fonts faces.
+/// 欢 (U+6B22): Simplified only, absent from the Japanese evo-fonts faces.
 const HANS_PROBE: char = '\u{6B22}';
-/// 說 (U+8AAA): Traditional only, absent from the Japanese craft-fonts faces.
+/// 說 (U+8AAA): Traditional only, absent from the Japanese evo-fonts faces.
 const HANT_PROBE: char = '\u{8AAA}';
 
 /// What the installed face is wanted for, from the interface language.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Need {
-    /// Scripts no embedded face has (Arabic in a build without craft-fonts).
+    /// Scripts no embedded face has (Arabic in a build without evo-fonts).
     #[default]
     Other,
     /// Simplified Chinese interface text.
@@ -69,7 +69,7 @@ pub fn fallback(need: Need) -> Option<Arc<FontData>> {
 }
 
 fn load(need: Need) -> Option<Arc<FontData>> {
-    if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
+    if std::env::var_os("EVOPDF_SYSTEM_FONTS").is_some_and(|v| v == "0") {
         return None;
     }
     let (probe, max) = match need {
@@ -123,7 +123,7 @@ pub fn hangul_fallback() -> Option<Arc<FontData>> {
 }
 
 fn script_fallback(candidates: &[PathBuf], probe: char) -> Option<Arc<FontData>> {
-    if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
+    if std::env::var_os("EVOPDF_SYSTEM_FONTS").is_some_and(|v| v == "0") {
         return None;
     }
     candidates.iter().find_map(|path| read(path, probe, MAX_BYTES))
@@ -397,7 +397,7 @@ fn unix_fonts(files: &'static [&'static str]) -> Vec<PathBuf> {
     // Read once per process, and not at all when installed fonts are turned off.
     let installed = INSTALLED
         .get_or_init(|| {
-            if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
+            if std::env::var_os("EVOPDF_SYSTEM_FONTS").is_some_and(|v| v == "0") {
                 return Vec::new();
             }
             fontconfig::font_files(&fontconfig::config_path())
@@ -500,7 +500,7 @@ mod tests {
     /// it is off, the way `tests/it/fonts.rs` skips for the same reason. Without this the suite goes red in exactly the
     /// mode `cargo xtask screenshots` uses.
     fn installed_faces_switched_off() -> bool {
-        std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0")
+        std::env::var_os("EVOPDF_SYSTEM_FONTS").is_some_and(|v| v == "0")
     }
 
     #[test]
@@ -509,7 +509,7 @@ mod tests {
         // different face and nobody would notice. Two bundled faces both cover 'A' and differ in
         // size, so the winner is identifiable by length alone.
         if installed_faces_switched_off() {
-            eprintln!("skipping: PDFCRAFT_SYSTEM_FONTS=0 turns the loader off before order matters");
+            eprintln!("skipping: EVOPDF_SYSTEM_FONTS=0 turns the loader off before order matters");
             return;
         }
         let dir = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts"));
@@ -527,7 +527,7 @@ mod tests {
         // This one calls `script_fallback` too, so it fails under the documented switch that
         // published screenshots use — skip with a reason, as tests/it/fonts.rs does.
         if installed_faces_switched_off() {
-            eprintln!("skipping: PDFCRAFT_SYSTEM_FONTS=0 turns the loader off");
+            eprintln!("skipping: EVOPDF_SYSTEM_FONTS=0 turns the loader off");
             return;
         }
         let inter = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets/fonts/Inter-Regular.ttf"));
@@ -605,7 +605,7 @@ mod tests {
     #[test]
     fn a_family_whose_name_has_spaces_is_still_found() {
         let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.subsec_nanos()).unwrap_or(0);
-        let root = std::env::temp_dir().join(format!("pdfcraft-macos-fonts-{}-{nanos}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("evopdf-macos-fonts-{}-{nanos}", std::process::id()));
         let supplemental = root.join("Supplemental");
         std::fs::create_dir_all(&supplemental).expect("build a temp macOS-shaped font tree");
         let dirs = [root.to_string_lossy().to_string(), supplemental.to_string_lossy().to_string()];
@@ -633,7 +633,7 @@ mod tests {
     #[test]
     fn every_installed_devanagari_face_is_reachable_on_this_mac() {
         if installed_faces_switched_off() {
-            eprintln!("skipping on this machine: PDFCRAFT_SYSTEM_FONTS=0 turns installed faces off");
+            eprintln!("skipping on this machine: EVOPDF_SYSTEM_FONTS=0 turns installed faces off");
             return;
         }
         let list = devanagari_candidates();

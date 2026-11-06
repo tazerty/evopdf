@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use egui_kittest::Harness;
-use pdfcraft_ui_egui::PdfCraftApp;
+use evopdf_ui_egui::EvoPdfApp;
 
 /// Collects faults, so that a red run names every one of them, and prints its count of checks,
 /// which must not change from run to run.
@@ -70,9 +70,9 @@ pub fn fixture() -> Vec<u8> {
 }
 
 /// The shell, in English, with `bytes` open as `name`.
-pub fn harness_with(name: &'static str, bytes: Vec<u8>) -> Harness<'static, PdfCraftApp> {
+pub fn harness_with(name: &'static str, bytes: Vec<u8>) -> Harness<'static, EvoPdfApp> {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 1000.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes(name, None, bytes.clone()).expect("the fixture opens");
         app
@@ -83,13 +83,13 @@ pub fn harness_with(name: &'static str, bytes: Vec<u8>) -> Harness<'static, PdfC
 }
 
 /// The shell on [`fixture`].
-pub fn harness() -> Harness<'static, PdfCraftApp> {
+pub fn harness() -> Harness<'static, EvoPdfApp> {
     harness_with("finitions.pdf", fixture())
 }
 
 /// A slow click at `(x, y)` points of page 1, from its top left corner, as a member clicks (the
 /// page [`PAGE_W`] points wide).
-pub fn click_page(h: &mut Harness<'static, PdfCraftApp>, x: f32, y: f32) {
+pub fn click_page(h: &mut Harness<'static, EvoPdfApp>, x: f32, y: f32) {
     let Some(r) = h.state().views.first().and_then(|v| v.page_screen_rect(0)) else { return };
     let k = r.width() / PAGE_W;
     let p = r.min + egui::vec2(x * k, y * k);
@@ -102,7 +102,7 @@ pub fn click_page(h: &mut Harness<'static, PdfCraftApp>, x: f32, y: f32) {
 }
 
 /// `text` typed as a keyboard does: each letter's key goes down, its character comes, the key goes up.
-pub fn type_text(h: &mut Harness<'static, PdfCraftApp>, text: &str) {
+pub fn type_text(h: &mut Harness<'static, EvoPdfApp>, text: &str) {
     for c in text.chars() {
         let key = egui::Key::from_name(&c.to_ascii_uppercase().to_string());
         if let Some(key) = key {

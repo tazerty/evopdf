@@ -1143,44 +1143,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "craft-docpath"
-version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63"
-
-[[package]]
-name = "craft-print"
-version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=666c358065261a2816b376fa3bb10538dbf53040#666c358065261a2816b376fa3bb10538dbf53040"
-dependencies = [
- "miniz_oxide 0.8.9",
- "roxmltree",
- "tempfile",
- "winprint",
- "winsafe",
-]
-
-[[package]]
-name = "craft-quit"
-version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=f58bc1a3df490992d633393d0898af0588ce882c#f58bc1a3df490992d633393d0898af0588ce882c"
-dependencies = [
- "dispatch2",
- "egui",
- "muda",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
-]
-
-[[package]]
-name = "craft-ui"
-version = "0.1.0"
-source = "git+https://github.com/storytold/craft-libs?rev=5c874d51eeb3de70e735c8ce87a59a7dedd47675#5c874d51eeb3de70e735c8ce87a59a7dedd47675"
-dependencies = [
- "egui",
- "serde",
-]
-
-[[package]]
 name = "crc32fast"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1923,6 +1885,557 @@ checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
  "pin-project-lite",
+]
+
+[[package]]
+name = "evo-docpath"
+version = "0.1.0"
+
+[[package]]
+name = "evo-print"
+version = "0.1.0"
+dependencies = [
+ "miniz_oxide 0.8.9",
+ "roxmltree",
+ "tempfile",
+ "winprint",
+ "winsafe",
+]
+
+[[package]]
+name = "evo-quit"
+version = "0.1.0"
+dependencies = [
+ "dispatch2",
+ "egui",
+ "muda",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+]
+
+[[package]]
+name = "evo-ui"
+version = "0.1.0"
+dependencies = [
+ "egui",
+ "serde",
+]
+
+[[package]]
+name = "evopdf"
+version = "0.14.0"
+dependencies = [
+ "chrono",
+ "eframe",
+ "egui",
+ "evo-quit",
+ "evopdf-engine",
+ "evopdf-ui-egui",
+ "fmv-macos-events",
+ "log",
+ "pollster 1.0.1",
+ "raw-window-handle",
+ "rustls-native-certs",
+ "serde_json",
+ "uds_windows",
+ "ureq",
+ "wayland-client",
+ "wayland-protocols",
+ "windows",
+ "winit",
+ "winresource",
+ "winsafe",
+]
+
+[[package]]
+name = "evopdf-a11y"
+version = "0.14.0"
+dependencies = [
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-filters",
+ "evopdf-fonts",
+ "evopdf-model",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-annot"
+version = "0.14.0"
+dependencies = [
+ "evopdf-cos",
+ "evopdf-fonts",
+ "evopdf-model",
+ "hayro-syntax",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-audit"
+version = "0.14.0"
+dependencies = [
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-edit",
+ "evopdf-model",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-automation"
+version = "0.14.0"
+dependencies = [
+ "base64 0.22.1",
+ "evopdf-cos",
+ "evopdf-engine",
+ "evopdf-fonts",
+ "evopdf-model",
+ "evopdf-organize",
+ "evopdf-platform",
+ "evopdf-render",
+ "evopdf-xfa",
+ "flate2",
+ "image",
+ "png 0.18.1",
+ "rustix 1.1.5",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+]
+
+[[package]]
+name = "evopdf-cli"
+version = "0.14.0"
+dependencies = [
+ "base64 0.22.1",
+ "evopdf-audit",
+ "evopdf-automation",
+ "evopdf-cos",
+ "evopdf-engine",
+ "evopdf-platform",
+ "evopdf-preflight",
+ "evopdf-render",
+ "png 0.18.1",
+ "rustix 1.1.5",
+ "serde_json",
+ "winresource",
+]
+
+[[package]]
+name = "evopdf-compare"
+version = "0.14.0"
+
+[[package]]
+name = "evopdf-content"
+version = "0.14.0"
+dependencies = [
+ "evopdf-cos",
+ "hayro-syntax",
+]
+
+[[package]]
+name = "evopdf-cos"
+version = "0.14.0"
+dependencies = [
+ "chrono",
+ "evopdf-crypt",
+ "evopdf-filters",
+ "evopdf-oracle",
+ "evopdf-testkit",
+ "hayro-syntax",
+ "proptest",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-create"
+version = "0.14.0"
+dependencies = [
+ "encoding_rs",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "evopdf-model",
+ "hayro-syntax",
+ "image",
+ "png 0.18.1",
+ "thiserror 2.0.21",
+ "tiff",
+ "zune-jpeg",
+]
+
+[[package]]
+name = "evopdf-crypt"
+version = "0.14.0"
+dependencies = [
+ "aes",
+ "md-5",
+ "proptest",
+ "sha2 0.11.0",
+ "stringprep",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-edit"
+version = "0.14.0"
+dependencies = [
+ "evopdf-annot",
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "evopdf-model",
+ "hayro-syntax",
+ "kurbo 0.13.1",
+ "thiserror 2.0.21",
+ "unicode-bidi",
+]
+
+[[package]]
+name = "evopdf-engine"
+version = "0.14.0"
+dependencies = [
+ "chrono",
+ "evo-docpath",
+ "evopdf-a11y",
+ "evopdf-annot",
+ "evopdf-audit",
+ "evopdf-compare",
+ "evopdf-cos",
+ "evopdf-create",
+ "evopdf-edit",
+ "evopdf-export",
+ "evopdf-fonts",
+ "evopdf-forms",
+ "evopdf-geom",
+ "evopdf-js",
+ "evopdf-measure",
+ "evopdf-model",
+ "evopdf-ocr",
+ "evopdf-optimize",
+ "evopdf-organize",
+ "evopdf-preflight",
+ "evopdf-print",
+ "evopdf-redact",
+ "evopdf-render",
+ "evopdf-sign",
+ "evopdf-testkit",
+ "evopdf-xfa",
+ "evopdf-xfdf",
+ "icu_properties",
+ "idna",
+ "image",
+ "png 0.18.1",
+ "thiserror 2.0.21",
+ "tiff",
+ "unicode-segmentation",
+ "url",
+]
+
+[[package]]
+name = "evopdf-export"
+version = "0.14.0"
+dependencies = [
+ "flate2",
+]
+
+[[package]]
+name = "evopdf-filters"
+version = "0.14.0"
+dependencies = [
+ "flate2",
+ "proptest",
+ "thiserror 2.0.21",
+ "weezl 0.2.1",
+]
+
+[[package]]
+name = "evopdf-fonts"
+version = "0.14.0"
+dependencies = [
+ "evopdf-cos",
+ "harfrust",
+ "skrifa 0.44.0",
+ "unicode-bidi",
+]
+
+[[package]]
+name = "evopdf-forms"
+version = "0.14.0"
+dependencies = [
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "evopdf-model",
+ "hayro-syntax",
+ "proptest",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-geom"
+version = "0.14.0"
+
+[[package]]
+name = "evopdf-js"
+version = "0.14.0"
+dependencies = [
+ "boa_engine",
+ "chrono",
+]
+
+[[package]]
+name = "evopdf-measure"
+version = "0.14.0"
+dependencies = [
+ "evopdf-annot",
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-model",
+ "evopdf-testkit",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-model"
+version = "0.14.0"
+dependencies = [
+ "evopdf-cos",
+]
+
+[[package]]
+name = "evopdf-ocr"
+version = "0.14.0"
+dependencies = [
+ "evopdf-fonts",
+ "ocrs",
+ "rten",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-optimize"
+version = "0.14.0"
+dependencies = [
+ "evopdf-annot",
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-filters",
+ "evopdf-model",
+ "evopdf-render",
+ "image",
+ "thiserror 2.0.21",
+ "zune-jpeg",
+]
+
+[[package]]
+name = "evopdf-oracle"
+version = "0.14.0"
+
+[[package]]
+name = "evopdf-organize"
+version = "0.14.0"
+dependencies = [
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-oracle",
+ "hayro-syntax",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-platform"
+version = "0.14.0"
+dependencies = [
+ "async-channel",
+ "futures-lite",
+ "rustix 1.1.5",
+ "zbus",
+]
+
+[[package]]
+name = "evopdf-preflight"
+version = "0.14.0"
+dependencies = [
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-model",
+ "flate2",
+ "roxmltree",
+]
+
+[[package]]
+name = "evopdf-print"
+version = "0.14.0"
+dependencies = [
+ "evo-print",
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-model",
+ "evopdf-render",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-redact"
+version = "0.14.0"
+dependencies = [
+ "evopdf-annot",
+ "evopdf-content",
+ "evopdf-cos",
+ "evopdf-edit",
+ "evopdf-fonts",
+ "evopdf-forms",
+ "evopdf-model",
+ "evopdf-testkit",
+ "evopdf-xfa",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-render"
+version = "0.14.0"
+dependencies = [
+ "bytemuck",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "flate2",
+ "getrandom 0.4.3",
+ "hayro",
+ "hayro-syntax",
+ "kurbo 0.13.1",
+ "log",
+ "lopdf",
+ "serde",
+ "skrifa 0.44.0",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-sign"
+version = "0.14.0"
+dependencies = [
+ "aes",
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "bp256",
+ "bp384",
+ "cbc",
+ "chrono",
+ "crypto-bigint",
+ "des",
+ "ecdsa",
+ "ed25519-dalek",
+ "evopdf-annot",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "evopdf-model",
+ "getrandom 0.4.3",
+ "hmac",
+ "p256",
+ "p384",
+ "p521",
+ "pbkdf2",
+ "rc2",
+ "ripemd",
+ "rsa",
+ "rustls-cng",
+ "security-framework",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "sha3",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-testkit"
+version = "0.14.0"
+
+[[package]]
+name = "evopdf-ui-egui"
+version = "0.14.0"
+dependencies = [
+ "arboard",
+ "base64 0.22.1",
+ "block2 0.6.2",
+ "bytemuck",
+ "chrono",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "egui_kittest",
+ "evo-quit",
+ "evo-ui",
+ "evopdf-cos",
+ "evopdf-engine",
+ "evopdf-fonts",
+ "evopdf-model",
+ "evopdf-platform",
+ "evopdf-render",
+ "evopdf-xfa",
+ "fontconfig-parser",
+ "getrandom 0.4.3",
+ "image",
+ "js-sys",
+ "log",
+ "objc2 0.6.4",
+ "objc2-app-kit 0.3.2",
+ "objc2-foundation 0.3.2",
+ "plist",
+ "png 0.18.1",
+ "pollster 1.0.1",
+ "rfd",
+ "rustix 1.1.5",
+ "serde",
+ "serde_json",
+ "skrifa 0.44.0",
+ "sys-locale",
+ "toml",
+ "unicode-bidi",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "winsafe",
+ "xattr",
+]
+
+[[package]]
+name = "evopdf-web"
+version = "0.14.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "evopdf-ui-egui",
+ "js-sys",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "evopdf-xfa"
+version = "0.14.0"
+dependencies = [
+ "base64 0.22.1",
+ "evopdf-cos",
+ "evopdf-fonts",
+ "image",
+ "png 0.18.1",
+ "roxmltree",
+ "sha2 0.11.0",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "evopdf-xfdf"
+version = "0.14.0"
+dependencies = [
+ "evopdf-annot",
+ "evopdf-cos",
+ "evopdf-forms",
+ "evopdf-model",
+ "roxmltree",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3930,523 +4443,6 @@ checksum = "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
 dependencies = [
  "digest 0.11.3",
  "hmac",
-]
-
-[[package]]
-name = "pdfcraft"
-version = "0.14.0"
-dependencies = [
- "chrono",
- "craft-quit",
- "eframe",
- "egui",
- "fmv-macos-events",
- "log",
- "pdfcraft-engine",
- "pdfcraft-ui-egui",
- "pollster 1.0.1",
- "raw-window-handle",
- "rustls-native-certs",
- "serde_json",
- "uds_windows",
- "ureq",
- "wayland-client",
- "wayland-protocols",
- "windows",
- "winit",
- "winresource",
- "winsafe",
-]
-
-[[package]]
-name = "pdfcraft-a11y"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-filters",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-annot"
-version = "0.14.0"
-dependencies = [
- "hayro-syntax",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-audit"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-edit",
- "pdfcraft-model",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-automation"
-version = "0.14.0"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "image",
- "pdfcraft-cos",
- "pdfcraft-engine",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "pdfcraft-organize",
- "pdfcraft-platform",
- "pdfcraft-render",
- "pdfcraft-xfa",
- "png 0.18.1",
- "rustix 1.1.5",
- "serde_json",
- "sha2 0.11.0",
- "tempfile",
-]
-
-[[package]]
-name = "pdfcraft-cli"
-version = "0.14.0"
-dependencies = [
- "base64 0.22.1",
- "pdfcraft-audit",
- "pdfcraft-automation",
- "pdfcraft-cos",
- "pdfcraft-engine",
- "pdfcraft-platform",
- "pdfcraft-preflight",
- "pdfcraft-render",
- "png 0.18.1",
- "rustix 1.1.5",
- "serde_json",
- "winresource",
-]
-
-[[package]]
-name = "pdfcraft-compare"
-version = "0.14.0"
-
-[[package]]
-name = "pdfcraft-content"
-version = "0.14.0"
-dependencies = [
- "hayro-syntax",
- "pdfcraft-cos",
-]
-
-[[package]]
-name = "pdfcraft-cos"
-version = "0.14.0"
-dependencies = [
- "chrono",
- "hayro-syntax",
- "pdfcraft-crypt",
- "pdfcraft-filters",
- "pdfcraft-oracle",
- "pdfcraft-testkit",
- "proptest",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-create"
-version = "0.14.0"
-dependencies = [
- "encoding_rs",
- "hayro-syntax",
- "image",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "png 0.18.1",
- "thiserror 2.0.21",
- "tiff",
- "zune-jpeg",
-]
-
-[[package]]
-name = "pdfcraft-crypt"
-version = "0.14.0"
-dependencies = [
- "aes",
- "md-5",
- "proptest",
- "sha2 0.11.0",
- "stringprep",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-edit"
-version = "0.14.0"
-dependencies = [
- "hayro-syntax",
- "kurbo 0.13.1",
- "pdfcraft-annot",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "thiserror 2.0.21",
- "unicode-bidi",
-]
-
-[[package]]
-name = "pdfcraft-engine"
-version = "0.14.0"
-dependencies = [
- "chrono",
- "craft-docpath",
- "icu_properties",
- "idna",
- "image",
- "pdfcraft-a11y",
- "pdfcraft-annot",
- "pdfcraft-audit",
- "pdfcraft-compare",
- "pdfcraft-cos",
- "pdfcraft-create",
- "pdfcraft-edit",
- "pdfcraft-export",
- "pdfcraft-fonts",
- "pdfcraft-forms",
- "pdfcraft-geom",
- "pdfcraft-js",
- "pdfcraft-measure",
- "pdfcraft-model",
- "pdfcraft-ocr",
- "pdfcraft-optimize",
- "pdfcraft-organize",
- "pdfcraft-preflight",
- "pdfcraft-print",
- "pdfcraft-redact",
- "pdfcraft-render",
- "pdfcraft-sign",
- "pdfcraft-testkit",
- "pdfcraft-xfa",
- "pdfcraft-xfdf",
- "png 0.18.1",
- "thiserror 2.0.21",
- "tiff",
- "unicode-segmentation",
- "url",
-]
-
-[[package]]
-name = "pdfcraft-export"
-version = "0.14.0"
-dependencies = [
- "flate2",
-]
-
-[[package]]
-name = "pdfcraft-filters"
-version = "0.14.0"
-dependencies = [
- "flate2",
- "proptest",
- "thiserror 2.0.21",
- "weezl 0.2.1",
-]
-
-[[package]]
-name = "pdfcraft-fonts"
-version = "0.14.0"
-dependencies = [
- "harfrust",
- "pdfcraft-cos",
- "skrifa 0.44.0",
- "unicode-bidi",
-]
-
-[[package]]
-name = "pdfcraft-forms"
-version = "0.14.0"
-dependencies = [
- "hayro-syntax",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "proptest",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-geom"
-version = "0.14.0"
-
-[[package]]
-name = "pdfcraft-js"
-version = "0.14.0"
-dependencies = [
- "boa_engine",
- "chrono",
-]
-
-[[package]]
-name = "pdfcraft-measure"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-annot",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-model",
- "pdfcraft-testkit",
- "serde",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-model"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-cos",
-]
-
-[[package]]
-name = "pdfcraft-ocr"
-version = "0.14.0"
-dependencies = [
- "ocrs",
- "pdfcraft-fonts",
- "rten",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-optimize"
-version = "0.14.0"
-dependencies = [
- "image",
- "pdfcraft-annot",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-filters",
- "pdfcraft-model",
- "pdfcraft-render",
- "thiserror 2.0.21",
- "zune-jpeg",
-]
-
-[[package]]
-name = "pdfcraft-oracle"
-version = "0.14.0"
-
-[[package]]
-name = "pdfcraft-organize"
-version = "0.14.0"
-dependencies = [
- "hayro-syntax",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-oracle",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-platform"
-version = "0.14.0"
-dependencies = [
- "async-channel",
- "futures-lite",
- "rustix 1.1.5",
- "zbus",
-]
-
-[[package]]
-name = "pdfcraft-preflight"
-version = "0.14.0"
-dependencies = [
- "flate2",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-model",
- "roxmltree",
-]
-
-[[package]]
-name = "pdfcraft-print"
-version = "0.14.0"
-dependencies = [
- "craft-print",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-model",
- "pdfcraft-render",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-redact"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-annot",
- "pdfcraft-content",
- "pdfcraft-cos",
- "pdfcraft-edit",
- "pdfcraft-fonts",
- "pdfcraft-forms",
- "pdfcraft-model",
- "pdfcraft-testkit",
- "pdfcraft-xfa",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-render"
-version = "0.14.0"
-dependencies = [
- "bytemuck",
- "flate2",
- "getrandom 0.4.3",
- "hayro",
- "hayro-syntax",
- "kurbo 0.13.1",
- "log",
- "lopdf",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "serde",
- "skrifa 0.44.0",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-sign"
-version = "0.14.0"
-dependencies = [
- "aes",
- "aws-lc-rs",
- "base64 0.22.1",
- "bp256",
- "bp384",
- "cbc",
- "chrono",
- "crypto-bigint",
- "des",
- "ecdsa",
- "ed25519-dalek",
- "getrandom 0.4.3",
- "hmac",
- "p256",
- "p384",
- "p521",
- "pbkdf2",
- "pdfcraft-annot",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "rc2",
- "ripemd",
- "rsa",
- "rustls-cng",
- "security-framework",
- "sha1 0.11.0",
- "sha2 0.11.0",
- "sha3",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-testkit"
-version = "0.14.0"
-
-[[package]]
-name = "pdfcraft-ui-egui"
-version = "0.14.0"
-dependencies = [
- "arboard",
- "base64 0.22.1",
- "block2 0.6.2",
- "bytemuck",
- "chrono",
- "craft-quit",
- "craft-ui",
- "eframe",
- "egui",
- "egui_extras",
- "egui_kittest",
- "fontconfig-parser",
- "getrandom 0.4.3",
- "image",
- "js-sys",
- "log",
- "objc2 0.6.4",
- "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
- "pdfcraft-cos",
- "pdfcraft-engine",
- "pdfcraft-fonts",
- "pdfcraft-model",
- "pdfcraft-platform",
- "pdfcraft-render",
- "pdfcraft-xfa",
- "plist",
- "png 0.18.1",
- "pollster 1.0.1",
- "rfd",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "skrifa 0.44.0",
- "sys-locale",
- "toml",
- "unicode-bidi",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "winsafe",
- "xattr",
-]
-
-[[package]]
-name = "pdfcraft-web"
-version = "0.14.0"
-dependencies = [
- "eframe",
- "egui",
- "js-sys",
- "pdfcraft-ui-egui",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
-name = "pdfcraft-xfa"
-version = "0.14.0"
-dependencies = [
- "base64 0.22.1",
- "image",
- "pdfcraft-cos",
- "pdfcraft-fonts",
- "png 0.18.1",
- "roxmltree",
- "sha2 0.11.0",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "pdfcraft-xfdf"
-version = "0.14.0"
-dependencies = [
- "pdfcraft-annot",
- "pdfcraft-cos",
- "pdfcraft-forms",
- "pdfcraft-model",
- "roxmltree",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -8070,9 +8066,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "evopdf-cos",
+ "evopdf-oracle",
  "lopdf",
- "pdfcraft-cos",
- "pdfcraft-oracle",
  "png 0.18.1",
  "serde",
  "serde_json",

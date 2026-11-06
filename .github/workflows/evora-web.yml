@@ -1,8 +1,7 @@
-# Evora : build web de PdfCraft, futur moteur de l'Atelier de Colophon (evora.st).
+# Evora : build web de EvoPdf, futur moteur de l'Atelier de Colophon (evora.st).
 #
-# Écrit pour le fork tazerty/pdfcraft à partir de packaging/web/package.sh, packaging/env.sh et
-# docs/releasing.md du dépôt (MIT OR Apache-2.0). Rien n'est repris de
-# storytold/craft-common-actions.
+# Écrit pour le fork tazerty/evopdf à partir de packaging/web/package.sh, packaging/env.sh et
+# docs/releasing.md du dépôt (MIT OR Apache-2.0). Rien n'est repris des actions communes de l'amont.
 #
 # Règles de ce workflow :
 #   - seules actions utilisées : actions/checkout, actions/cache et actions/upload-artifact,
@@ -16,7 +15,8 @@
 #
 # Portes BLOQUANTES (patch E1 posé) : cargo-deny (advisories, bans, licences, sources ; deny.toml de
 # l'amont et exceptions d'avis nommées par Evora, vérifiées hors du graphe web) ;
-# cargo-about (LICENSES/ agrégé) ; marques ArtCraft dans le bundle (0 hors LICENSES/) ; fichiers
+# cargo-about (LICENSES/ agrégé) ; marques amont dans le bundle (0 hors LICENSES/) ; nom amont retiré
+# absent du site (porte zéro terme, 0 hors LICENSES/, autotest compris) ; fichiers
 # d'hébergement (0) ; émojis des catalogues affichés (E10) ; termes sensibles affichés après le
 # catalogue de surcharge (E9) ; empreintes CSP des scripts inline ; test de fumée Chrome depuis une
 # origine différente (avec et sans CSP), avec audit au rendu des émojis et des termes (E9, E10).
@@ -31,7 +31,7 @@
 # sabordé (BroadcastChannel inerte, aucun écouteur storage) qui doit rougir.
 #
 # Masquages de l'Atelier (EVORA-COL-25 ; COL-05, COL-10, OCR, hypothèse Q47 (a)) : job « masques »,
-# tests natifs de pdfcraft-ui-egui dans le vrai shell (egui_kittest, AccessKit et textes dessinés),
+# tests natifs de evopdf-ui-egui dans le vrai shell (egui_kittest, AccessKit et textes dessinés),
 # crates/ui-egui/tests/evora_masks.rs, sur toutes les surfaces qui listent des commandes ; et, au rendu
 # du bundle, scénario de fumée « masquages » (surfaces du démarrage). Témoin sabordé (EVORA-COL-30) :
 # la recette, garde enforce coupée (fonctionnalité CI evora-witness-enforce), doit rougir par ses seuls
@@ -42,7 +42,7 @@
 #
 # Sortie : artefact de run evora-colophon-atelier-web-<tag> (archive .zip avec .br/.gz, LICENSES/
 # et csp-hashes.txt ; SHA256SUMS ; BUILD-INFO.txt ; csp-hashes.txt) et artefact evora-smoke-<tag>.
-# Le nom Evora n'a été pris qu'après E1 (retrait des marques ArtCraft) et le vert des portes.
+# Le nom Evora n'a été pris qu'après E1 (retrait des marques amont) et le vert des portes.
 
 name: Evora web
 
@@ -83,8 +83,9 @@ env:
   # cargo-about-<v>-x86_64-unknown-linux-musl.tar.gz (empreinte relevée sur la release GitHub).
   CARGO_ABOUT_VERSION: "0.9.2"
   CARGO_ABOUT_SHA256: "9099a59e820c38a68b9d65f300662a567d56562f9a10f6aa4c7e86c17c2566af"
-  # Entrée de build craft-fonts au commit cité par le dépôt (docs/releasing.md, ci.yml, release.yml).
-  CRAFT_FONTS_REF: "3d9ab3a132ed0eff457e424226a435a901da30d3"
+  # Entrée de build tazerty/evo-fonts : copie du paquet libre d'origine, mêmes faces et mêmes licences
+  # qu'au commit cité par le dépôt (docs/releasing.md, ci.yml, release.yml).
+  EVO_FONTS_REF: "2a8ebd4f51de7b0532e5e0f9eadb2e9185eaa6ab"
 
 jobs:
   web:
@@ -97,12 +98,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Checkout de craft-fonts (commit épinglé)
+      - name: Checkout de evo-fonts (commit épinglé)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: storytold/craft-fonts
-          ref: ${{ env.CRAFT_FONTS_REF }}
-          path: evora-ci/craft-fonts
+          repository: tazerty/evo-fonts
+          ref: ${{ env.EVO_FONTS_REF }}
+          path: evora-ci/evo-fonts
           persist-credentials: false
 
       - name: Tag amont et nom de l'artefact
@@ -138,7 +139,7 @@ jobs:
           {
             echo "## Evora : build web $TAG"
             echo
-            echo "Commit \`$(git rev-parse HEAD)\` ; craft-fonts \`$CRAFT_FONTS_REF\`."
+            echo "Commit \`$(git rev-parse HEAD)\` ; evo-fonts \`$EVO_FONTS_REF\`."
             echo
           } > "$RUNNER_TEMP/evora-portes.md"
 
@@ -265,32 +266,32 @@ jobs:
           exit "$status"
 
       - name: Build web release (trunk, hors ligne)
-        working-directory: apps/pdfcraft-web
+        working-directory: apps/evopdf-web
         env:
-          CRAFT_FONTS_DIR: ${{ github.workspace }}/evora-ci/craft-fonts
-          CRAFT_FONTS_REQUIRED: "1"
+          EVO_FONTS_DIR: ${{ github.workspace }}/evora-ci/evo-fonts
+          EVO_FONTS_REQUIRED: "1"
           TRUNK_TOOLS_WASM_BINDGEN: ${{ env.WASM_BINDGEN_VERSION }}
           TRUNK_TOOLS_WASM_OPT: ${{ env.BINARYEN_VERSION }}
         run: trunk build --release --locked --offline
 
-      - name: Polices craft-fonts (E6 ; commit épinglé vérifié, faces embarquées mesurées)
+      - name: Polices evo-fonts (E6 ; commit épinglé vérifié, faces embarquées mesurées)
         env:
           REPORT: ${{ steps.meta.outputs.report }}
         run: |
           set -euo pipefail
-          have="$(git -C evora-ci/craft-fonts rev-parse HEAD)"
-          if [ "$have" != "$CRAFT_FONTS_REF" ]; then
-            echo "::error::craft-fonts au commit $have, épinglé $CRAFT_FONTS_REF"; exit 1
+          have="$(git -C evora-ci/evo-fonts rev-parse HEAD)"
+          if [ "$have" != "$EVO_FONTS_REF" ]; then
+            echo "::error::evo-fonts au commit $have, épinglé $EVO_FONTS_REF"; exit 1
           fi
-          echo "::notice::craft-fonts au commit épinglé $have"
-          python3 -I .github/evora/gates.py fonts evora-ci/craft-fonts "$REPORT"
+          echo "::notice::evo-fonts au commit épinglé $have"
+          python3 -I .github/evora/gates.py fonts evora-ci/evo-fonts "$REPORT"
 
       - name: Licences des dépendances (cargo-about ; bloquante)
         env:
           REPORT: ${{ steps.meta.outputs.report }}
         run: |
           set -euo pipefail
-          cargo about generate --manifest-path apps/pdfcraft-web/Cargo.toml -c .github/evora/about.toml \
+          cargo about generate --manifest-path apps/evopdf-web/Cargo.toml -c .github/evora/about.toml \
             --format json --frozen --fail -o "$RUNNER_TEMP/about.json"
           python3 -I .github/evora/licenses.py "$RUNNER_TEMP/about.json" "$RUNNER_TEMP/THIRD-PARTY-LICENSES.txt"
           n="$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d.get("crates", [])), len(d.get("licenses", [])))' "$RUNNER_TEMP/about.json")"
@@ -305,7 +306,7 @@ jobs:
         id: pkg
         env:
           NAME: ${{ steps.meta.outputs.name }}
-          CRAFT_FONTS_DIR: ${{ github.workspace }}/evora-ci/craft-fonts
+          EVO_FONTS_DIR: ${{ github.workspace }}/evora-ci/evo-fonts
         run: |
           set -euo pipefail
           SITE="$GITHUB_WORKSPACE/dist/web"
@@ -326,10 +327,10 @@ jobs:
           for f in LICENSE-MIT LICENSE-APACHE NOTICE ATTRIBUTION.md; do
             if [ -f "$f" ]; then cp "$f" "$PKG/LICENSES/"; fi
           done
-          # E1 : mention en texte simple « basé sur PdfCraft par l'équipe ArtCraft » (hors du bundle).
-          cp apps/pdfcraft-web/EVORA-MENTIONS.txt "$PKG/LICENSES/MENTIONS-EVORA.txt"
-          # Licences des polices craft-fonts embarquées (logique de copy_font_licences, packaging/env.sh).
-          for f in "$CRAFT_FONTS_DIR"/fonts/*/OFL.txt; do
+          # E1 : mention en texte simple du projet d'origine, seulement dans LICENSES/ (licence de marque amont).
+          cp apps/evopdf-web/MENTIONS-EVORA.txt "$PKG/LICENSES/MENTIONS-EVORA.txt"
+          # Licences des polices evo-fonts embarquées (logique de copy_font_licences, packaging/env.sh).
+          for f in "$EVO_FONTS_DIR"/fonts/*/OFL.txt; do
             if [ -f "$f" ]; then cp "$f" "$PKG/LICENSES/OFL-$(basename "$(dirname "$f")").txt"; fi
           done
           # Licences des dépendances Rust (cargo-about).
@@ -349,6 +350,27 @@ jobs:
           PKG: ${{ steps.pkg.outputs.pkg }}
           REPORT: ${{ steps.meta.outputs.report }}
         run: python3 -I .github/evora/gates.py check "$PKG" "$GITHUB_WORKSPACE" "$REPORT"
+
+      - name: Porte zéro terme (nom amont retiré absent du site, hors LICENSES/ ; bloquante)
+        env:
+          PKG: ${{ steps.pkg.outputs.pkg }}
+          REPORT: ${{ steps.meta.outputs.report }}
+        run: |
+          # L'autotest prouve que la porte sait rougir, avant de juger le site.
+          set -euo pipefail
+          python3 -I .github/evora/zero-terme.py selftest
+          set +e
+          python3 -I .github/evora/zero-terme.py check "$PKG" > "$RUNNER_TEMP/zero-terme.log" 2>&1
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/zero-terme.log"
+          {
+            echo "### Porte zéro terme (bloquante)"
+            echo
+            echo "Statut **$status** : $(tail -n 1 "$RUNNER_TEMP/zero-terme.log") ; $(head -n 1 "$RUNNER_TEMP/zero-terme.log")."
+            echo
+          } >> "$REPORT"
+          exit "$status"
 
       - name: Empreintes CSP, précompression et taille
         env:
@@ -393,7 +415,7 @@ jobs:
             echo "wasm-opt: $(wasm-opt --version)"
             echo "cargo-deny: $(cargo-deny --version)"
             echo "cargo-about: $(cargo-about --version)"
-            echo "craft-fonts: $CRAFT_FONTS_REF"
+            echo "evo-fonts: $EVO_FONTS_REF"
             echo "run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           } > "$OUT/BUILD-INFO.txt"
           (cd "$OUT" && sha256sum "$NAME.zip" BUILD-INFO.txt csp-hashes.txt > SHA256SUMS)
@@ -508,7 +530,7 @@ jobs:
           CARGO_PROFILE_DEV_DEBUG: "0"
         run: |
           set -euo pipefail
-          cargo test --locked --offline -p pdfcraft-ui-egui --test evora_masks -- --test-threads=1 --nocapture 2>&1 \
+          cargo test --locked --offline -p evopdf-ui-egui --test evora_masks -- --test-threads=1 --nocapture 2>&1 \
             | tee "$RUNNER_TEMP/masques.log"
 
       - name: Témoin sabordé de la garde des masquages (enforce coupée ; doit rougir par ses seuls détecteurs)
@@ -521,7 +543,7 @@ jobs:
           # directement, automatisation, clic sur un champ de signature vide), aux mêmes inventaires.
           set +e
           set -uo pipefail
-          cargo test --locked --offline -p pdfcraft-ui-egui --features evora-witness-enforce --test evora_masks \
+          cargo test --locked --offline -p evopdf-ui-egui --features evora-witness-enforce --test evora_masks \
             -- --test-threads=1 --nocapture > "$RUNNER_TEMP/temoin.log" 2>&1
           status=$?
           set -e
@@ -544,7 +566,7 @@ jobs:
           # inventaires, les jumeaux restant verts.
           set +e
           set -uo pipefail
-          cargo test --locked --offline -p pdfcraft-ui-egui --features evora-witness-palette-groups --test evora_masks \
+          cargo test --locked --offline -p evopdf-ui-egui --features evora-witness-palette-groups --test evora_masks \
             -- --test-threads=1 --nocapture > "$RUNNER_TEMP/temoin-palette.log" 2>&1
           status=$?
           set -e
@@ -561,7 +583,7 @@ jobs:
           RUST_BACKTRACE: "0"
           CARGO_PROFILE_DEV_DEBUG: "0"
           # Les polices de l'interface seules, comme dans le build web : aucune police du système en repli.
-          PDFCRAFT_SYSTEM_FONTS: "0"
+          EVOPDF_SYSTEM_FONTS: "0"
         run: |
           # EVORA-COL-58 : F5, le menu principal ouvert ne dessine aucun caractère absent des polices de
           # l'interface (témoin : ses sous-menus dessinés). EVORA-COL-63 (RC2-11 d'Evora) : aucune source du
@@ -569,7 +591,7 @@ jobs:
           # par l'étape suivante depuis EVORA-COL-63. Lancée même après une recette des masquages rouge, pour
           # que chaque témoin sabordé se lise en entier.
           set -euo pipefail
-          cargo test --locked --offline -p pdfcraft-ui-egui --test evora_finitions -- --test-threads=1 --nocapture 2>&1 \
+          cargo test --locked --offline -p evopdf-ui-egui --test evora_finitions -- --test-threads=1 --nocapture 2>&1 \
             | tee "$RUNNER_TEMP/finitions.log"
 
       - name: Saisie jamais coupée par un enregistrement, texte Unicode, polices indirectes (bloquante)
@@ -585,7 +607,7 @@ jobs:
           # occidentale est du vrai texte en Inter incorporée (le chinois reste refusé, témoin) ; les polices du
           # texte ajouté sont des objets indirects (Poppler : « xref num … not found but needed »).
           set -euo pipefail
-          cargo test --locked --offline -p pdfcraft-ui-egui --test evora_saisie -- --test-threads=1 --nocapture 2>&1 \
+          cargo test --locked --offline -p evopdf-ui-egui --test evora_saisie -- --test-threads=1 --nocapture 2>&1 \
             | tee "$RUNNER_TEMP/saisie.log"
 
       - name: Enregistrements relus par Poppler (pdffonts, pdfinfo, pdftotext ; bloquante)

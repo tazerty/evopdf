@@ -18,8 +18,8 @@ if [[ -z "${APPLE_CERTIFICATE:-}" ]]; then
 fi
 
 TMP="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
-KEYCHAIN="$TMP/pdfcraft-signing.keychain-db"
-CERT="$TMP/pdfcraft-signing.p12"
+KEYCHAIN="$TMP/evopdf-signing.keychain-db"
+CERT="$TMP/evopdf-signing.p12"
 KC_PASS="${KEYCHAIN_PASSWORD:-$(openssl rand -hex 24)}"
 
 trap 'rm -f "$CERT"' EXIT

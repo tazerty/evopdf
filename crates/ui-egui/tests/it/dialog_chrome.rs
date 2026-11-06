@@ -3,7 +3,7 @@
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use pdfcraft_ui_egui::PdfCraftApp;
+use evopdf_ui_egui::EvoPdfApp;
 
 fn fixture() -> Vec<u8> {
     fixture_with_info(None)
@@ -33,14 +33,14 @@ fn fixture_with_info(info: Option<&str>) -> Vec<u8> {
     out
 }
 
-fn card(h: &Harness<'_, PdfCraftApp>, id: &str) -> egui::Rect {
+fn card(h: &Harness<'_, EvoPdfApp>, id: &str) -> egui::Rect {
     h.ctx.data(|d| d.get_temp(egui::Id::new(id).with("card"))).unwrap_or_else(|| panic!("missing dialog card {id}"))
 }
 
 fn protected() -> Vec<u8> {
-    let mut doc = pdfcraft_cos::Document::open(std::sync::Arc::new(fixture())).unwrap();
-    doc.set_encryption(&pdfcraft_cos::NewEncryption {
-        algorithm: pdfcraft_cos::Algorithm::Aes256,
+    let mut doc = evopdf_cos::Document::open(std::sync::Arc::new(fixture())).unwrap();
+    doc.set_encryption(&evopdf_cos::NewEncryption {
+        algorithm: evopdf_cos::Algorithm::Aes256,
         user_password: "pw",
         owner_password: "owner",
         permissions: -1,
@@ -48,13 +48,13 @@ fn protected() -> Vec<u8> {
         seed: [4; 32],
     })
     .unwrap();
-    pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()
+    evopdf_cos::write_full(&doc, &Default::default()).unwrap()
 }
 
 #[test]
 fn document_properties_fields_are_tall_and_inset() {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("doc.pdf", None, fixture()).unwrap();
         app.set_option("dialog", "properties").unwrap();
@@ -74,7 +74,7 @@ fn document_properties_fields_are_tall_and_inset() {
 #[test]
 fn password_prompt_field_is_tall_and_inset() {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("secret.pdf", None, protected()).unwrap();
         app
@@ -93,7 +93,7 @@ fn password_prompt_field_is_tall_and_inset() {
 fn document_properties_long_filename_does_not_overflow_card() {
     let long_name = "Global_sociology_introducing_five_contemporary_societies_Schneider_Linda_Silverman_Arnold_2000_Boston_isbn13_9780072294309_hash_3d2960a9212a8573bba2536e91f36e59_archive_copy.pdf";
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes(long_name, None, fixture()).unwrap();
         app.set_option("dialog", "properties").unwrap();
@@ -108,7 +108,7 @@ fn document_properties_long_filename_does_not_overflow_card() {
 fn document_properties_values_line_up_and_long_fields_wrap() {
     let info = "<< /Title (Showcase) /Subject (A specimen document exercising typography, world scripts, vector art, forms and annotations) /Creator (demo-pdf) >>";
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("doc.pdf", None, fixture_with_info(Some(info))).unwrap();
         app.set_option("dialog", "properties").unwrap();
@@ -132,10 +132,10 @@ fn document_properties_values_line_up_and_long_fields_wrap() {
 
 #[test]
 fn space_audit_tab_measures_the_file_and_stays_in_the_card() {
-    use pdfcraft_ui_egui::{Dialog, PropsTab};
+    use evopdf_ui_egui::{Dialog, PropsTab};
     let open = |dialog: Dialog| {
         let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-            let mut app = PdfCraftApp::new();
+            let mut app = EvoPdfApp::new();
             app.set_option("language", "en").unwrap();
             app.open_bytes("doc.pdf", None, fixture()).unwrap();
             app.dialog = Some(dialog);
@@ -147,7 +147,7 @@ fn space_audit_tab_measures_the_file_and_stays_in_the_card() {
     let fonts = card(&open(Dialog::Properties(PropsTab::Fonts)), "dialog");
     // The tab is reachable by name, like the other Properties tabs.
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("doc.pdf", None, fixture()).unwrap();
         app.set_option("dialog", "space-audit").unwrap();
@@ -170,9 +170,9 @@ fn space_audit_tab_measures_the_file_and_stays_in_the_card() {
 
 #[test]
 fn space_audit_tab_measures_again_after_an_edit() {
-    use pdfcraft_engine::optimize::SpaceCategory;
+    use evopdf_engine::optimize::SpaceCategory;
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("doc.pdf", None, fixture()).unwrap();
         app.set_option("dialog", "space-audit").unwrap();
@@ -180,14 +180,14 @@ fn space_audit_tab_measures_again_after_an_edit() {
     });
     h.run_steps(4);
     let bookmarks =
-        |h: &Harness<'_, PdfCraftApp>| h.state().space_audit.iter().filter(|r| r.category == SpaceCategory::Bookmarks).map(|r| r.bytes).sum::<u64>();
+        |h: &Harness<'_, EvoPdfApp>| h.state().space_audit.iter().filter(|r| r.category == SpaceCategory::Bookmarks).map(|r| r.bytes).sum::<u64>();
     let before = h.state().space_audit.clone();
     assert_eq!(bookmarks(&h), 0, "the fixture has no outline: {before:?}");
     // Further frames with the file unchanged keep the same measurement.
     h.run_steps(2);
     assert_eq!(h.state().space_audit, before);
     // An edit while the tab is open is measured on the next frame.
-    h.state_mut().apply_edit(pdfcraft_engine::Edit::AddBookmark {
+    h.state_mut().apply_edit(evopdf_engine::Edit::AddBookmark {
         parent: vec![],
         index: 0,
         title: "Chapter".into(),
@@ -204,9 +204,9 @@ fn space_audit_tab_measures_again_after_an_edit() {
 
 #[test]
 fn dialog_buttons_follow_the_content_after_a_taller_tab() {
-    use pdfcraft_ui_egui::{Dialog, PropsTab};
+    use evopdf_ui_egui::{Dialog, PropsTab};
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("doc.pdf", None, fixture()).unwrap();
         app.dialog = Some(Dialog::Properties(PropsTab::InitialView));
@@ -227,7 +227,7 @@ fn dialog_buttons_follow_the_content_after_a_taller_tab() {
 #[test]
 fn page_hover_cursors_stay_off_while_a_dialog_is_open() {
     let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         app.open_bytes("form.pdf", None, include_bytes!("../data/form.pdf").to_vec()).unwrap();
         // Small enough that the check box sits above the dialog card.

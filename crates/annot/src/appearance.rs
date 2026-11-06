@@ -1,4 +1,4 @@
-//! Appearance streams (§12.5.5) for the comment types PdfCraft creates, execution plan M5.2.
+//! Appearance streams (§12.5.5) for the comment types EvoPdf creates, execution plan M5.2.
 //!
 //! [`build`] draws a normal appearance (`/AP /N`) from the annotation dictionary alone, so the
 //! same code serves new comments and restyled ones. Drawings are in page space with
@@ -6,13 +6,13 @@
 //! It returns `None` for anything it cannot draw faithfully (cloudy borders, unknown line
 //! endings, indirect geometry), so callers never replace an appearance with a worse one.
 //!
-//! The note icons are PdfCraft's own drawings (AGENTS.md §1). Text boxes use the standard
+//! The note icons are EvoPdf's own drawings (AGENTS.md §1). Text boxes use the standard
 //! Helvetica font with WinAnsi encoding; line breaking uses [`text_width`], an approximation of
 //! Helvetica's proportions by character class (no font program or metrics file is bundled).
 
-use pdfcraft_cos::{Dict, Object, PdfString, Stream};
-use pdfcraft_fonts::{first_undrawable, literal, win_ansi};
-pub use pdfcraft_fonts::{helvetica_width as text_width, wrap};
+use evopdf_cos::{Dict, Object, PdfString, Stream};
+use evopdf_fonts::{first_undrawable, literal, win_ansi};
+pub use evopdf_fonts::{helvetica_width as text_width, wrap};
 
 use crate::{NOTE_SIZE, Rgb, n};
 
@@ -370,7 +370,7 @@ fn caret_layout(d: &Dict, rect: [f64; 4]) -> ([f64; 4], Option<(f64, f64, f64)>)
 
 /// Draw the normal appearance of an annotation, or `None` if this subtype/variant isn't supported.
 /// Text the standard fonts can't draw comes out as `?`: [`undrawable_text`] says which, and
-/// [`crate::set_appearance`] marks the annotation with it (`pdfcraft_fonts::UNDRAWN_MARK`).
+/// [`crate::set_appearance`] marks the annotation with it (`evopdf_fonts::UNDRAWN_MARK`).
 pub fn build(d: &Dict) -> Option<Stream> {
     // Imported measurement appearances may include leaders, captions and formatting that
     // this builder cannot reproduce. Preserve them rather than silently losing detail.
@@ -689,13 +689,13 @@ pub fn build(d: &Dict) -> Option<Stream> {
                 let turn = picture_turn(d);
                 if image && turn != 0 {
                     // The page's view matrix without its offset: display axes in user space.
-                    let m = pdfcraft_model::view_matrix_for(turn, [0.0; 4]);
+                    let m = evopdf_model::view_matrix_for(turn, [0.0; 4]);
                     let matrix = [m[0], m[1], m[2], m[3], 0.0, 0.0];
                     stream.dict.set(b"Matrix".to_vec(), Object::Array(matrix.iter().map(|x| Object::Real(*x)).collect()));
                 }
                 return Some(stream);
             }
-            // Only PdfCraft's own Fill & Sign marks are drawn here.
+            // Only EvoPdf's own Fill & Sign marks are drawn here.
             let name = d.name(b"Name")?;
             let col = stroke.unwrap_or([0.0; 3]);
             // A mark or stamp placed on a turned page is drawn upright in its displayed box, then
@@ -714,7 +714,7 @@ pub fn build(d: &Dict) -> Option<Stream> {
             };
             let turned = |mut stream: Stream| {
                 if turn != 0 {
-                    let m = pdfcraft_model::view_matrix_for(turn, rect);
+                    let m = evopdf_model::view_matrix_for(turn, rect);
                     stream.dict.set(b"Matrix".to_vec(), Object::Array(m.iter().copied().map(Object::Real).collect()));
                 }
                 stream
@@ -763,7 +763,7 @@ pub fn build(d: &Dict) -> Option<Stream> {
                     n(y0 + h / 2.0)
                 )),
                 other => {
-                    // Only stamps PdfCraft made: others keep their own artwork.
+                    // Only stamps EvoPdf made: others keep their own artwork.
                     if !matches!(d.get(b"PCStamp"), Some(Object::Bool(true))) {
                         return None;
                     }
@@ -794,7 +794,7 @@ pub fn build(d: &Dict) -> Option<Stream> {
                 if dw < 1.0 || dh < 1.0 {
                     return None;
                 }
-                ([0.0, 0.0, dw, dh], Some(pdfcraft_model::view_matrix_for(turn, rect)))
+                ([0.0, 0.0, dw, dh], Some(evopdf_model::view_matrix_for(turn, rect)))
             };
             let full = rect;
             let mut rect = rect;
@@ -882,7 +882,7 @@ pub fn build(d: &Dict) -> Option<Stream> {
         }
         _ => return None,
     }
-    // PdfCraft measurement captions are kept separate from the comment's free-form text.
+    // EvoPdf measurement captions are kept separate from the comment's free-form text.
     // A restyle regenerates the path and its value together.
     let mut out = c.into_bytes();
     out.extend(tail);
@@ -905,7 +905,7 @@ pub fn build(d: &Dict) -> Option<Stream> {
 
 /// The label and colour of a standard rubber stamp name (ISO 32000-2 Table 184), for a stamp
 /// another program wrote without an appearance. Names are matched byte for byte, as PDF names
-/// are compared (§7.3.5). Eight are stamps of PdfCraft's palette; the other six take a label of
+/// are compared (§7.3.5). Eight are stamps of EvoPdf's palette; the other six take a label of
 /// their own and the palette's colour for their meaning.
 fn standard_stamp(name: &[u8]) -> Option<(&'static str, Rgb)> {
     use crate::StampKind::*;
@@ -936,7 +936,7 @@ const PLACEHOLDER_GREY: Rgb = [0.45, 0.45, 0.45];
 ///
 /// For display only ([`crate::with_missing_appearances`]): [`build`] declines these stamps, so
 /// edits (restyling, flattening) never write this drawing into the file. `None` for any other
-/// annotation, one of PdfCraft's own stamps, a dictionary with an `/AP` (a stamp's own artwork is
+/// annotation, one of EvoPdf's own stamps, a dictionary with an `/AP` (a stamp's own artwork is
 /// never replaced; the display copy passes the dictionary without an `/AP` that has no normal
 /// appearance), or a `/Rect` that isn't finite or is under a point wide or high.
 pub(crate) fn display_stamp(d: &Dict) -> Option<Stream> {
@@ -1006,7 +1006,7 @@ fn line_length(v: Option<f64>) -> f64 {
 
 /// The caption a Line with `/Cap true` shows (ISO 32000-2 Table 178): its `/Contents`, else the
 /// plain text of its `/RC`, on one line and cut to [`MAX_CAPTION_CHARS`]. `None` without a
-/// caption, and for PdfCraft's own measurements, whose label (`/PCMeasureValue`) is the caption.
+/// caption, and for EvoPdf's own measurements, whose label (`/PCMeasureValue`) is the caption.
 fn line_caption(d: &Dict) -> Option<String> {
     if !matches!(d.get(b"Cap"), Some(Object::Bool(true))) || d.contains(b"PCMeasureValue") {
         return None;
@@ -1314,9 +1314,9 @@ fn ellipse(x0: f64, y0: f64, x1: f64, y1: f64) -> String {
     s
 }
 
-/// PdfCraft's note icons, drawn in a 20 × 20 box: a speech bubble for `/Comment`, a page
+/// EvoPdf's note icons, drawn in a 20 × 20 box: a speech bubble for `/Comment`, a page
 /// with a folded corner for everything else, both filled with the note colour.
-/// File attachment icons in a 20 × 20 box: PdfCraft's own drawings.
+/// File attachment icons in a 20 × 20 box: EvoPdf's own drawings.
 fn attach_icon(name: &str, col: Rgb) -> String {
     let mut s = format!("{}{}1.2 w 1 j 1 J\n", rg(col), rg_stroke(col));
     match name {
@@ -1368,7 +1368,7 @@ fn circle_path(x: f64, y: f64, r: f64) -> String {
 
 /// A note's icon in a 20 × 20 box: filled in `col`, outlined in dark grey. Each name of
 /// [`crate::NoteIcon`] has its own shape, so the icon a note names is the one it shows (ISO
-/// 32000-2 §12.5.6.4, Table 175); a name PdfCraft doesn't know draws as `Note`.
+/// 32000-2 §12.5.6.4, Table 175); a name EvoPdf doesn't know draws as `Note`.
 fn note_icon(name: &str, col: Rgb) -> String {
     let mut s = format!("{}0.25 0.25 0.25 RG 0.8 w 1 j 1 J\n", rg(col));
     match name {

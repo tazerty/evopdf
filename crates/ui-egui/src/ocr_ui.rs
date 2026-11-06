@@ -5,11 +5,11 @@
 use std::sync::{Arc, Mutex};
 
 use egui::{Align, Layout};
-use pdfcraft_engine::DocId;
-use pdfcraft_engine::ocr::{LANGUAGES, OcrPage, OcrSettings};
+use evopdf_engine::DocId;
+use evopdf_engine::ocr::{LANGUAGES, OcrPage, OcrSettings};
 
 use crate::theme::{self, Tokens};
-use crate::{PdfCraftApp, widgets};
+use crate::{EvoPdfApp, widgets};
 
 /// Which pages to read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,7 +62,7 @@ pub struct BatchProgress {
     pub message: Option<String>,
 }
 
-/// A page Edit should read now (see [`PdfCraftApp::scan_to_read`]).
+/// A page Edit should read now (see [`EvoPdfApp::scan_to_read`]).
 struct ScanToRead {
     view: usize,
     doc: DocId,
@@ -90,9 +90,9 @@ pub struct AutoOcr {
     pub generation: u64,
 }
 
-pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (bool, bool) {
+pub(crate) fn body(ui: &mut egui::Ui, app: &mut EvoPdfApp, t: &Tokens) -> (bool, bool) {
     let pages = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(1, |d| d.info.pages.len().max(1));
-    let available = pdfcraft_engine::ocr::available();
+    let available = evopdf_engine::ocr::available();
     let d = &mut app.ocr_draft;
     d.to = d.to.clamp(1, pages);
     d.from = d.from.clamp(1, d.to);
@@ -148,7 +148,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     });
     if !available {
         ui.label(
-            egui::RichText::new(tl!("Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them."))
+            egui::RichText::new(tl!("Text recognition isn't installed: its model files are missing. Reinstall EvoPdf, or set EVOPDF_MODELS to the folder that holds them."))
                 .small()
                 .color(t.text_muted),
         );
@@ -169,7 +169,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     (go, cancel)
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Recognize text on the pages chosen in the dialog, in the background.
     pub fn start_ocr(&mut self) {
         let Some((vi, id)) = self.active_ids() else { return };
@@ -206,7 +206,7 @@ impl PdfCraftApp {
             return;
         }
         let Some(scan) = self.scan_to_read() else { return };
-        if !pdfcraft_engine::ocr::available() {
+        if !evopdf_engine::ocr::available() {
             self.views[scan.view].auto_ocr_skipped.insert(scan.page, scan.generation);
             return;
         }
@@ -280,7 +280,7 @@ impl PdfCraftApp {
         let work = move || {
             crate::i18n::set_current(lang);
             let result = recognize_guarded(|| {
-                pdfcraft_engine::ocr::engine().map(|ocr| {
+                evopdf_engine::ocr::engine().map(|ocr| {
                     job.run(&ocr, |done, total| {
                         let Ok(mut s) = p.lock() else { return false };
                         s.done = done;
@@ -297,7 +297,7 @@ impl PdfCraftApp {
         if self.run_inline {
             work();
         } else {
-            std::thread::Builder::new().name("pdfcraft-ocr".into()).spawn(work).ok();
+            std::thread::Builder::new().name("evopdf-ocr".into()).spawn(work).ok();
         }
         #[cfg(target_arch = "wasm32")]
         work();
@@ -341,9 +341,9 @@ impl PdfCraftApp {
             crate::i18n::set_current(lang);
             // A panic in the recognizer still ends the batch with a summary (#3919).
             #[cfg(not(target_arch = "wasm32"))]
-            let summary = pdfcraft_engine::guard(|| recognize_files(files, &settings, &p, &dir));
+            let summary = evopdf_engine::guard(|| recognize_files(files, &settings, &p, &dir));
             #[cfg(target_arch = "wasm32")]
-            let summary = pdfcraft_engine::guard(|| recognize_files(files, &settings, &p));
+            let summary = evopdf_engine::guard(|| recognize_files(files, &settings, &p));
             let summary = summary.unwrap_or_else(|panic| failed(&panic));
             if let Ok(mut s) = p.lock() {
                 s.done = s.total;
@@ -354,7 +354,7 @@ impl PdfCraftApp {
         if self.run_inline {
             work();
         } else {
-            std::thread::Builder::new().name("pdfcraft-ocr-files".into()).spawn(work).ok();
+            std::thread::Builder::new().name("evopdf-ocr-files".into()).spawn(work).ok();
         }
         #[cfg(target_arch = "wasm32")]
         work();
@@ -371,14 +371,14 @@ fn recognize_files(
     #[cfg(not(target_arch = "wasm32"))] dir: &std::path::Path,
 ) -> String {
     let (mut ok, mut words, mut failed) = (0, 0, Vec::new());
-    match pdfcraft_engine::ocr::engine() {
+    match evopdf_engine::ocr::engine() {
         Err(e) => failed.push(e),
         Ok(ocr) => {
             for (i, (name, bytes)) in files.into_iter().enumerate() {
                 if let Ok(mut s) = p.lock() {
                     s.done = i;
                 }
-                let r = pdfcraft_engine::ocr::recognize_file(&name, Arc::new(bytes), None, settings.clone(), &ocr, |_, _| true);
+                let r = evopdf_engine::ocr::recognize_file(&name, Arc::new(bytes), None, settings.clone(), &ocr, |_, _| true);
                 let saved = r.and_then(|r| {
                     #[cfg(not(target_arch = "wasm32"))]
                     crate::editing::write_atomically(&dir.join(&name).to_string_lossy(), &r.bytes).map_err(|e| e.to_string())?;
@@ -408,7 +408,7 @@ fn recognize_files(
     msg
 }
 
-impl PdfCraftApp {
+impl EvoPdfApp {
     /// Stop a running recognition (the pages read so far are kept).
     pub fn cancel_ocr(&mut self) {
         if let Some(r) = &self.ocr_run
@@ -545,14 +545,14 @@ fn failed(e: &str) -> String {
 /// `recognize`, with a panic in it (a damaged model, a page the recognizer can't take) turned into
 /// the run's error: the run has to end either way, or it refuses every later one (#3919).
 fn recognize_guarded<T>(recognize: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
-    pdfcraft_engine::guard(recognize).unwrap_or_else(|panic| Err(failed(&panic)))
+    evopdf_engine::guard(recognize).unwrap_or_else(|panic| Err(failed(&panic)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{Dialog, LeftPanel, Mode, QuickTool};
-    use pdfcraft_engine::{Edit, Session};
+    use evopdf_engine::{Edit, Session};
 
     /// A one-page PDF that is one picture covering the page.
     fn scan() -> Vec<u8> {
@@ -563,14 +563,14 @@ mod tests {
         Session::new().create_from_images(&[("scan.png".into(), png.into_inner())]).unwrap().to_vec()
     }
 
-    fn app_with(pdf: Vec<u8>) -> PdfCraftApp {
-        let mut app = PdfCraftApp::new();
+    fn app_with(pdf: Vec<u8>) -> EvoPdfApp {
+        let mut app = EvoPdfApp::new();
         app.open_bytes("doc.pdf", None, pdf).unwrap();
         app.quick_tool = QuickTool::EditText;
         app
     }
 
-    fn found(app: &mut PdfCraftApp) -> Option<usize> {
+    fn found(app: &mut EvoPdfApp) -> Option<usize> {
         app.scan_to_read().map(|s| s.page)
     }
 
@@ -634,14 +634,14 @@ mod tests {
     /// asked for is applied at once. The result is made up, so no OCR models are needed.
     #[test]
     fn the_result_of_an_automatic_run_waits_for_read_mode_and_dialogs() {
-        let word = || pdfcraft_engine::ocr::PlacedWord { text: "scanned".into(), origin: [72.0, 700.0], across: [60.0, 0.0], up: [0.0, 12.0] };
-        let finished = |app: &PdfCraftApp, automatic: bool| {
+        let word = || evopdf_engine::ocr::PlacedWord { text: "scanned".into(), origin: [72.0, 700.0], across: [60.0, 0.0], up: [0.0, 12.0] };
+        let finished = |app: &EvoPdfApp, automatic: bool| {
             let generation = app.session.get(app.active_ids().unwrap().1).unwrap().edit_generation();
-            let page = pdfcraft_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None };
+            let page = evopdf_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None };
             let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
             OcrRun { doc: app.active_ids().unwrap().1, progress, automatic: automatic.then_some(AutoOcr { page: 0, generation }) }
         };
-        let label = |app: &PdfCraftApp| app.session.get(app.active_ids().unwrap().1).unwrap().can_undo().map(String::from);
+        let label = |app: &EvoPdfApp| app.session.get(app.active_ids().unwrap().1).unwrap().can_undo().map(String::from);
 
         let mut app = app_with(scan());
         app.ocr_run = Some(finished(&app, true));
@@ -672,9 +672,9 @@ mod tests {
         let mut app = app_with(scan());
         let id = app.active_ids().unwrap().1;
         let generation = app.session.get(id).unwrap().edit_generation();
-        let page = pdfcraft_engine::ocr::OcrPage {
+        let page = evopdf_engine::ocr::OcrPage {
             page: 0,
-            words: vec![pdfcraft_engine::ocr::PlacedWord { text: "scanned".into(), origin: [72.0, 700.0], across: [60.0, 0.0], up: [0.0, 12.0] }],
+            words: vec![evopdf_engine::ocr::PlacedWord { text: "scanned".into(), origin: [72.0, 700.0], across: [60.0, 0.0], up: [0.0, 12.0] }],
             already_on_page: 0,
             skipped: None,
         };
@@ -715,7 +715,7 @@ mod tests {
 
     #[test]
     fn a_run_whose_worker_died_ends_instead_of_waiting_forever() {
-        let mut app = PdfCraftApp::new();
+        let mut app = EvoPdfApp::new();
         app.set_option("language", "en").unwrap();
         let progress = Arc::new(Mutex::new(OcrProgress { total: 3, ..Default::default() }));
         poison(&progress);

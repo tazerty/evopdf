@@ -1,5 +1,5 @@
-//! Embeds the fonts of the optional craft-fonts build input (`CRAFT_FONTS_DIR`) as `CRAFT_FONTS`.
-//! The recipe is craft-fonts' `docs/integration.md`; unset, `CRAFT_FONTS` is empty. It only reads
+//! Embeds the fonts of the optional evo-fonts build input (`EVO_FONTS_DIR`) as `EVO_FONTS`.
+//! The recipe is evo-fonts' `docs/integration.md`; unset, `EVO_FONTS` is empty. It only reads
 //! the local checkout (no network). On wasm32 it embeds only the UI faces (BIZ UDPGothic Regular
 //! and any `Arab`, `Telu`, `Hebr`, `Thai` or `Deva` face), to keep the web build within hosting
 //! limits (Cloudflare Pages: 25 MiB per file).
@@ -11,27 +11,27 @@ use std::path::PathBuf;
 mod cjk_scripts;
 
 fn main() {
-    println!("cargo::rerun-if-env-changed=CRAFT_FONTS_DIR");
-    println!("cargo::rerun-if-env-changed=CRAFT_FONTS_REQUIRED");
-    let mut src = String::from("pub static CRAFT_FONTS: &[CraftFont] = &[\n");
-    if let Some(dir) = std::env::var_os("CRAFT_FONTS_DIR").map(PathBuf::from) {
-        match craft_fonts(&dir) {
+    println!("cargo::rerun-if-env-changed=EVO_FONTS_DIR");
+    println!("cargo::rerun-if-env-changed=EVO_FONTS_REQUIRED");
+    let mut src = String::from("pub static EVO_FONTS: &[EvoFont] = &[\n");
+    if let Some(dir) = std::env::var_os("EVO_FONTS_DIR").map(PathBuf::from) {
+        match evo_fonts(&dir) {
             Ok(entries) => src.push_str(&entries),
-            Err(e) if std::env::var_os("CRAFT_FONTS_REQUIRED").is_some() => {
-                println!("cargo::error=CRAFT_FONTS_DIR={}: {e}", dir.display());
+            Err(e) if std::env::var_os("EVO_FONTS_REQUIRED").is_some() => {
+                println!("cargo::error=EVO_FONTS_DIR={}: {e}", dir.display());
             }
-            Err(e) => println!("cargo::warning=building without craft-fonts: CRAFT_FONTS_DIR={}: {e}", dir.display()),
+            Err(e) => println!("cargo::warning=building without evo-fonts: EVO_FONTS_DIR={}: {e}", dir.display()),
         }
     }
     src.push_str("];\n");
-    let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()).join("craft_fonts.rs");
+    let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()).join("evo_fonts.rs");
     if let Err(e) = std::fs::write(&out, src) {
         println!("cargo::error=writing {}: {e}", out.display());
     }
 }
 
-/// One `CraftFont { .. }` initialiser per manifest line.
-fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
+/// One `EvoFont { .. }` initialiser per manifest line.
+fn evo_fonts(dir: &std::path::Path) -> Result<String, String> {
     let manifest = dir.join("fonts/manifest.txt");
     println!("cargo::rerun-if-changed={}", manifest.display());
     let text = std::fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
@@ -43,7 +43,7 @@ fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
             return Err(format!("malformed manifest line: {line}"));
         };
         // Whole CJK faces aren't embedded for size; interface CJK comes from cut faces once the app
-        // moves to craft-fonts-build (storytold/craft-libs#213).
+        // moves to evo-fonts-build (vendor/evo-libs#213).
         let cjk = scripts.split(',').any(cjk_scripts::is_cjk_script);
         if cjk
             && !cjk_scripts::WHOLE_CJK_FAMILIES.contains(family)
@@ -73,7 +73,7 @@ fn craft_fonts(dir: &std::path::Path) -> Result<String, String> {
         let scripts: Vec<String> = scripts.split(',').map(|s| format!("{:?}", s.trim())).collect();
         let _ = writeln!(
             out,
-            "    CraftFont {{ family: {family:?}, style: {style:?}, scripts: &[{}], bytes: include_bytes!({:?}) }},",
+            "    EvoFont {{ family: {family:?}, style: {style:?}, scripts: &[{}], bytes: include_bytes!({:?}) }},",
             scripts.join(", "),
             path.display().to_string(),
         );

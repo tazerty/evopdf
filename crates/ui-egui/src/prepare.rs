@@ -6,9 +6,9 @@
 //! its name; clicks select fields instead of filling them in, as in Acrobat.
 
 use egui::{Color32, CornerRadius, Pos2, Rect, Stroke, vec2};
-use pdfcraft_engine::form_scripts::{CalcOp, Calculate, DATE_PRESETS, Format, TIME_PRESETS, Validate, format_value};
-use pdfcraft_engine::{BorderStyle, Document, Edit, FieldFont, FieldLook, FieldProps, FormField, FormFieldKind, NewField};
-use pdfcraft_render::DocInfo;
+use evopdf_engine::form_scripts::{CalcOp, Calculate, DATE_PRESETS, Format, TIME_PRESETS, Validate, format_value};
+use evopdf_engine::{BorderStyle, Document, Edit, FieldFont, FieldLook, FieldProps, FormField, FormFieldKind, NewField};
+use evopdf_render::DocInfo;
 
 use crate::canvas::{DocView, PageXform};
 use crate::comments;
@@ -722,7 +722,7 @@ pub(crate) fn after_refresh(view: &mut DocView, form: &[FormField]) {
 
 // ───────────────────────────────────────────────────────────────────────── Field Properties
 
-impl crate::PdfCraftApp {
+impl crate::EvoPdfApp {
     /// Open Field Properties for a field of the active document.
     pub fn open_field_props(&mut self, name: &str, widget: usize) {
         let Some((index, id)) = self.active_ids() else { return };
@@ -789,7 +789,7 @@ pub const ACTION_KINDS: [&str; 8] = [
 /// Actions tab: the action being added.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActionDraft {
-    pub trigger: pdfcraft_engine::FieldTrigger,
+    pub trigger: evopdf_engine::FieldTrigger,
     pub kind: usize,
     /// The script, URL, field names (comma-separated), menu item or page number.
     pub text: String,
@@ -797,13 +797,13 @@ pub struct ActionDraft {
 
 impl Default for ActionDraft {
     fn default() -> Self {
-        ActionDraft { trigger: pdfcraft_engine::FieldTrigger::MouseUp, kind: 0, text: String::new() }
+        ActionDraft { trigger: evopdf_engine::FieldTrigger::MouseUp, kind: 0, text: String::new() }
     }
 }
 
 impl ActionDraft {
-    pub fn action(&self) -> Result<pdfcraft_engine::FieldAction, String> {
-        use pdfcraft_engine::FieldAction as A;
+    pub fn action(&self) -> Result<evopdf_engine::FieldAction, String> {
+        use evopdf_engine::FieldAction as A;
         let t = self.text.trim();
         let names = || t.split(',').map(str::trim).filter(|s| !s.is_empty()).map(str::to_string).collect::<Vec<_>>();
         Ok(match self.kind {
@@ -856,20 +856,20 @@ pub struct FieldDraft {
     pub rotation: i64,
     pub look: Option<FieldLook>,
     /// Check boxes and radio buttons: the mark when on (Options tab).
-    pub check_style: Option<pdfcraft_engine::CheckStyle>,
+    pub check_style: Option<evopdf_engine::CheckStyle>,
     pub format: Format,
     pub validate: Validate,
     pub calculate: Calculate,
     /// Every other field's name (the Calculate tab picks from them).
     pub others: Vec<String>,
     /// Actions tab: each trigger's action, and the one being added.
-    pub actions: Vec<(pdfcraft_engine::FieldTrigger, pdfcraft_engine::FieldAction)>,
+    pub actions: Vec<(evopdf_engine::FieldTrigger, evopdf_engine::FieldAction)>,
     pub new_action: ActionDraft,
     /// Actions tab: the trigger whose script `new_action` is editing (Edit), if any.
-    pub editing: Option<pdfcraft_engine::FieldTrigger>,
+    pub editing: Option<evopdf_engine::FieldTrigger>,
     /// Actions tab: how many actions the document chains after each trigger's first one. They are
     /// kept when that first action is replaced.
-    pub chained: Vec<(pdfcraft_engine::FieldTrigger, usize)>,
+    pub chained: Vec<(evopdf_engine::FieldTrigger, usize)>,
     original: Box<Option<FieldDraft>>,
 }
 
@@ -910,8 +910,8 @@ impl FieldDraft {
             tooltip: f.tooltip.clone().unwrap_or_default(),
             caption: f.widgets.get(widget).and_then(|w| w.caption.clone()).unwrap_or_default(),
             read_only: f.read_only(),
-            required: f.has(pdfcraft_engine::field_flags::REQUIRED),
-            multiline: f.has(pdfcraft_engine::field_flags::MULTILINE),
+            required: f.has(evopdf_engine::field_flags::REQUIRED),
+            multiline: f.has(evopdf_engine::field_flags::MULTILINE),
             limit: f.max_len.is_some(),
             max_len: f.max_len.unwrap_or(0),
             options: f.options.iter().map(|(_, d)| d.clone()).collect(),
@@ -1001,7 +1001,7 @@ impl FieldDraft {
 
 /// The `/Ff` bits the Options tab edits.
 const OPTION_FLAGS: [u32; 10] = {
-    use pdfcraft_engine::field_flags as ff;
+    use evopdf_engine::field_flags as ff;
     [
         ff::DO_NOT_SCROLL,
         ff::RICH_TEXT,
@@ -1204,7 +1204,7 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Toke
                     });
                 }
                 FormFieldKind::Text => {
-                    use pdfcraft_engine::field_flags as ff;
+                    use evopdf_engine::field_flags as ff;
                     egui::Grid::new("text-options").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
                         alignment(ui, &mut d.quadding);
                         ui.end_row();
@@ -1239,7 +1239,7 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Toke
                     });
                 }
                 FormFieldKind::CheckBox | FormFieldKind::Radio => {
-                    use pdfcraft_engine::field_flags as ff;
+                    use evopdf_engine::field_flags as ff;
                     let on = d.on_state.clone();
                     ui.label(crate::i18n::fmt(tl!("Export Value: {on}"), &[("on", &on)]));
                     let mut checked = !d.default.is_empty() && d.default == on;
@@ -1254,7 +1254,7 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Toke
                             egui::ComboBox::from_id_salt("check-style")
                                 .selected_text(tl!(style.label()))
                                 .show_ui(ui, |ui| {
-                                    for s in pdfcraft_engine::CheckStyle::ALL {
+                                    for s in evopdf_engine::CheckStyle::ALL {
                                         ui.selectable_value(style, s, tl!(s.label()));
                                     }
                                 })
@@ -1306,7 +1306,7 @@ pub(crate) fn body(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Toke
                     if d.options.is_empty() {
                         ui.label(egui::RichText::new(tl!("Add the choices people pick from.")).color(t.text_muted));
                     }
-                    use pdfcraft_engine::field_flags as ff;
+                    use evopdf_engine::field_flags as ff;
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
                         ui.label(tl!("Default:"));
@@ -1553,7 +1553,7 @@ fn validate_tab(ui: &mut egui::Ui, d: &mut FieldDraft) {
 }
 
 fn actions_tab(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Tokens) {
-    use pdfcraft_engine::FieldTrigger as T;
+    use evopdf_engine::FieldTrigger as T;
     let editing = d.editing.is_some();
     ui.label(egui::RichText::new(if editing { tl!("Edit Action") } else { tl!("Add an Action") }).font(theme::semibold(13.0)));
     let a = &mut d.new_action;
@@ -1643,7 +1643,7 @@ fn actions_tab(ui: &mut egui::Ui, d: &mut FieldDraft, t: &crate::theme::Tokens) 
                         if ui.button(tl!("Delete")).clicked() {
                             remove = Some(i);
                         }
-                        if let pdfcraft_engine::FieldAction::JavaScript(js) = act
+                        if let evopdf_engine::FieldAction::JavaScript(js) = act
                             && ui.add_enabled(d.editing.is_none(), egui::Button::new(tl!("Edit"))).clicked()
                         {
                             edit = Some((*tr, js.clone()));

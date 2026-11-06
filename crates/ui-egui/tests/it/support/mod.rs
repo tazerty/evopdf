@@ -1,7 +1,7 @@
 //! State-based waits for native preparation, which completes between UI frames, and pointer
 //! input in the frames the platform delivers it in ([`input`]).
 use egui_kittest::Harness;
-use pdfcraft_ui_egui::PdfCraftApp;
+use evopdf_ui_egui::EvoPdfApp;
 
 pub mod input;
 
@@ -10,7 +10,7 @@ pub mod input;
 /// not a time, and a busy runner may not have finished the work within one. Sleeps briefly between
 /// frames so the worker threads get the CPU.
 #[must_use]
-pub fn step_until(h: &mut Harness<'static, PdfCraftApp>, mut ready: impl FnMut(&mut Harness<'static, PdfCraftApp>) -> bool) -> bool {
+pub fn step_until(h: &mut Harness<'static, EvoPdfApp>, mut ready: impl FnMut(&mut Harness<'static, EvoPdfApp>) -> bool) -> bool {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
         h.step();
@@ -26,7 +26,7 @@ pub fn step_until(h: &mut Harness<'static, PdfCraftApp>, mut ready: impl FnMut(&
 
 /// Step frames until nothing is waiting to be rendered, and fail the test if that takes over 30
 /// seconds: what a test checks next is on the rendered page.
-pub fn settle(h: &mut Harness<'static, PdfCraftApp>) {
+pub fn settle(h: &mut Harness<'static, EvoPdfApp>) {
     let settled = step_until(h, |h| {
         h.run_steps(1);
         !h.state().render_pending()
@@ -34,7 +34,7 @@ pub fn settle(h: &mut Harness<'static, PdfCraftApp>) {
     assert!(settled, "pages rendered");
 }
 
-pub fn wait_until(h: &mut Harness<'static, PdfCraftApp>, what: &str, ready: impl Fn(&PdfCraftApp) -> bool) {
+pub fn wait_until(h: &mut Harness<'static, EvoPdfApp>, what: &str, ready: impl Fn(&EvoPdfApp) -> bool) {
     let held = step_until(h, |h| ready(h.state()));
     assert!(
         held,

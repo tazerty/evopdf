@@ -1,6 +1,6 @@
 [package]
-name = "pdfcraft-ui-egui"
-description = "The egui shell of PdfCraft"
+name = "evopdf-ui-egui"
+description = "The egui shell of EvoPdf"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -20,15 +20,15 @@ evora-witness-enforce = []
 evora-witness-palette-groups = []
 
 [dependencies]
-craft-ui = { workspace = true }
+evo-ui = { workspace = true }
 # macOS: a window close quits through `terminate:` (the Touch Bar crash, #1136); elsewhere a no-op.
-craft-quit = { workspace = true, features = ["egui"] }
-pdfcraft-fonts = { workspace = true }
-pdfcraft-engine = { workspace = true }
-pdfcraft-cos = { workspace = true }
-pdfcraft-render = { workspace = true }
-pdfcraft-model = { workspace = true }
-pdfcraft-platform = { workspace = true }
+evo-quit = { workspace = true, features = ["egui"] }
+evopdf-fonts = { workspace = true }
+evopdf-engine = { workspace = true }
+evopdf-cos = { workspace = true }
+evopdf-render = { workspace = true }
+evopdf-model = { workspace = true }
+evopdf-platform = { workspace = true }
 egui = { workspace = true, features = ["bytemuck"] }
 egui_extras = { workspace = true }
 eframe = { workspace = true, features = ["default_fonts", "wgpu", "accesskit", "persistence", "links"] }
@@ -63,7 +63,7 @@ pollster = "1.0"
 fontconfig-parser = "0.5.8"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# Safe AppKit calls for drag coordinates and repairing an existing per-file PDFCraft binding.
+# Safe AppKit calls for drag coordinates and repairing an existing per-file EvoPdf binding.
 # The Objective-C wrappers and block support are already in the tree through arboard and rfd.
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSScreen", "NSWorkspace", "block2"] }
@@ -71,7 +71,7 @@ objc2-foundation = { version = "0.3", default-features = false, features = ["std
 block2 = "0.6"
 plist = "1.10"
 # A plain fsync where a volume refuses the full flush `sync_all` asks for (SMB, FUSE); already in
-# the tree through pdfcraft-cli.
+# the tree through evopdf-cli.
 rustix = { version = "1", features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
@@ -89,10 +89,10 @@ js-sys = "0.3"
 web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "HtmlIFrameElement", "HtmlImageElement", "HtmlCollection", "Node", "EventTarget", "Navigator"] }
 
 [dev-dependencies]
-pdfcraft-xfa = { workspace = true }
+evopdf-xfa = { workspace = true }
 egui_kittest = { workspace = true, features = ["eframe", "wgpu"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
-# Glyph-coverage test of the interface fonts; the same skrifa pdfcraft-fonts already uses.
+# Glyph-coverage test of the interface fonts; the same skrifa evopdf-fonts already uses.
 skrifa = "0.44"
 
 [build-dependencies]

@@ -2,8 +2,8 @@
 //! follows each pointer frame, moved or resized, without editing the PDF.
 
 use egui::{ColorImage, TextureHandle, TextureOptions, pos2, vec2};
-use pdfcraft_engine::{Document, Edit};
-use pdfcraft_render::{PageInfo, RenderPool, RenderRequest, Tile};
+use evopdf_engine::{Document, Edit};
+use evopdf_render::{PageInfo, RenderPool, RenderRequest, Tile};
 
 use crate::QuickTool;
 use crate::comments::{CommentView, Gesture, PageCx};

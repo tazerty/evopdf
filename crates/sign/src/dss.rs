@@ -7,7 +7,7 @@
 //! incremental update, which the change classifier treats as a permitted "document security
 //! store" change.
 
-use pdfcraft_cos::{Dict, Document, Object, SaveOptions, Stream};
+use evopdf_cos::{Dict, Document, Object, SaveOptions, Stream};
 
 use crate::SignError;
 
@@ -95,11 +95,11 @@ pub fn embed(doc: &Document, evidence: &Evidence) -> Result<Vec<u8>, SignError> 
     doc.update_dict(root, |c| c.set(b"DSS".to_vec(), Object::Ref(dss_ref)))?;
     // What the user removed again before this (a cleared redaction mark) stays out of the file,
     // as in a save; the store and everything in it are reachable from the catalog.
-    Ok(pdfcraft_cos::write_incremental(&doc, &SaveOptions { drop_unlinked: true, ..SaveOptions::default() })?)
+    Ok(evopdf_cos::write_incremental(&doc, &SaveOptions { drop_unlinked: true, ..SaveOptions::default() })?)
 }
 
 /// Store one DER blob as a `/Type /Embed` stream.
-fn embed_stream(doc: &mut Document, blob: &[u8]) -> pdfcraft_cos::ObjRef {
+fn embed_stream(doc: &mut Document, blob: &[u8]) -> evopdf_cos::ObjRef {
     let mut d = Dict::new();
     d.set(b"Type".to_vec(), Object::name("Embed"));
     doc.add(Object::Stream(Stream::from_raw(d, blob.to_vec())))

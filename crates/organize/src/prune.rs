@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use pdfcraft_cos::{CosError, DecodeBudget, Dict, Document, ObjRef, Object};
+use evopdf_cos::{CosError, DecodeBudget, Dict, Document, ObjRef, Object};
 
 use crate::OrganizeError;
 
@@ -188,7 +188,7 @@ impl Pruner<'_> {
             self.unsure.insert(key);
             return;
         }
-        for op in pdfcraft_content::parse(data).ops {
+        for op in evopdf_content::parse(data).ops {
             if op.op.as_slice() != b"Do" {
                 continue;
             }

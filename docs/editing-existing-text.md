@@ -25,7 +25,7 @@ completes its subsets automatically, including new Chinese characters. When the 
 the complete program of a paragraph's font (not a subset) and its licence allows editable
 embedding, a character the font's encoding can't show is drawn with that same program. A
 character no available face has is refused with an error that names it, and a CJK character
-without a craft-fonts build says so. Replacement text takes the craft-fonts Japanese faces when
+without a evo-fonts build says so. Replacement text takes the evo-fonts Japanese faces when
 they can draw all of it, and the bundled Inter face (`assets/fonts`) for the Latin, Greek and
 Cyrillic letters they lack (Uzbek `қизил`, Kazakh `әже`): that face needs no build input, so
 these work in every build, the web one included. Choosing another face
@@ -39,10 +39,10 @@ shares a single copy of it. The Type 3 fonts generated for Japanese or Hebrew ch
 page's fonts lack are made anew by each edit; after an edit, those nothing on the page shows any
 more leave the page's resources, unless some content that could name them can't be read.
 Original subset bytes are
-preserved. Optional matching faces from `CRAFT_FONTS_DIR` can also complete source subsets;
+preserved. Optional matching faces from `EVO_FONTS_DIR` can also complete source subsets;
 this works only when that build input actually contains the full face. This change does not
 add a font binary or change the release font pin. Fonts shared by releases belong in
-`storytold/craft-fonts` under the repository's asset rules.
+`tazerty/evo-fonts` under the repository's asset rules.
 
 When mixed-style text needs outline fallback, characters using the same actual fallback face
 share Type 3 fonts, with at most 240 distinct glyphs per font. Adjacent characters with the same
@@ -91,7 +91,7 @@ scanned line kept apart. Applying an edit draws the new text visibly in the scan
 the one chosen) and first covers the old words with the paper colour sampled around them. Each
 word keeps its position and width, and a longer phrase grows rightwards rather than wrapping. The
 cover is one flat colour, and the text uses the layer's Helvetica, not the scanned typeface.
-This applies to any invisible text (rendering mode 3), not just a PdfCraft OCR layer: editing
+This applies to any invisible text (rendering mode 3), not just a EvoPdf OCR layer: editing
 invisible text, such as another OCR tool's layer, makes the rewritten paragraph visible over a
 painted cover in the sampled paper colour. Edit text also groups invisible text differently: its lines never
 merge into multi-line paragraphs, and words split at gaps of 0.6 em or more.

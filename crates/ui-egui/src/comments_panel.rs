@@ -8,8 +8,8 @@
 use std::collections::HashMap;
 
 use egui::{Align, Color32, CornerRadius, Layout, Sense, Stroke, vec2};
-use pdfcraft_engine::{Edit, NoteIcon, ReviewState, Shape};
-use pdfcraft_render::{Annotation, DocInfo};
+use evopdf_engine::{Edit, NoteIcon, ReviewState, Shape};
+use evopdf_render::{Annotation, DocInfo};
 
 use crate::canvas::DocView;
 use crate::comments::{CommentPrefs, CommentTool, SortBy, color32, status_badge};
@@ -106,8 +106,8 @@ fn matches(a: &Annotation, q: &str) -> bool {
 
 /// Whether one of `fields` contains `q` in any case, Turkish dotted and dotless i included.
 fn any_contains<'a>(fields: impl IntoIterator<Item = &'a str>, q: &str) -> bool {
-    let q = pdfcraft_render::text::fold_case(q);
-    fields.into_iter().any(|s| pdfcraft_render::text::fold_case(s).contains(&q))
+    let q = evopdf_render::text::fold_case(q);
+    fields.into_iter().any(|s| evopdf_render::text::fold_case(s).contains(&q))
 }
 
 /// Draw the panel body. Returns an edit to apply (posting, replying, deleting…).
@@ -141,7 +141,7 @@ pub(crate) fn show(
             if let Some(p) = info.pages.get(page) {
                 let at = p.view_to_user(p.width - 44.0, 24.0);
                 let text = std::mem::take(&mut view.comments.add_box);
-                edit = Some(Edit::AddAnnotation(pdfcraft_engine::NewAnnotation {
+                edit = Some(Edit::AddAnnotation(evopdf_engine::NewAnnotation {
                     page,
                     shape: Shape::Note { at: [at[0] as f64, at[1] as f64], icon: NoteIcon::Comment },
                     style: prefs.style(CommentTool::Note),
@@ -173,7 +173,7 @@ pub(crate) fn show(
     // ISO 32000-2 §12.5.6.2): one set on a reply, at any depth, is that reply's and not the
     // comment's, so the card's badge and checkmark leave it out (comment_list reports it on the
     // reply). Page badges count roots before filtering.
-    let tops = pdfcraft_render::thread_tops(&info.annotations);
+    let tops = evopdf_render::thread_tops(&info.annotations);
     for a in &info.annotations {
         if let Some(parent) = a.parent {
             let key = if a.state.is_none() { tops.get(&(a.page, a.index)).copied().unwrap_or(parent) } else { parent };

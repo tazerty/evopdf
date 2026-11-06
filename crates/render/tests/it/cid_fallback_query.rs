@@ -17,9 +17,9 @@ fn fixture(descendant_extra: &str, descriptor: Option<&str>) -> Vec<u8> {
         "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".into(),
         "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".into(),
         stream("", "BT /F1 24 Tf 10 40 Td <11b30ed4> Tj ET"),
-        "<< /Type /Font /Subtype /Type0 /BaseFont /CraftCJK-W3 /Encoding /Identity-H /DescendantFonts [6 0 R] >>".into(),
+        "<< /Type /Font /Subtype /Type0 /BaseFont /EvoCJK-W3 /Encoding /Identity-H /DescendantFonts [6 0 R] >>".into(),
         format!(
-            "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /CraftCJK-W3 \
+            "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /EvoCJK-W3 \
              /CIDSystemInfo << /Registry (Adobe) /Ordering (GB1) /Supplement 2 >> {descendant_extra} >>"
         ),
     ];
@@ -53,11 +53,11 @@ fn fallback_queries(bytes: Vec<u8>) -> Vec<FallbackFontQuery> {
 #[test]
 fn a_cid_font_fallback_request_carries_its_descendants_style() {
     // Flags: Serif (bit 2), Nonsymbolic (bit 6), Italic (bit 7) = 2 + 32 + 64.
-    let descriptor = "<< /Type /FontDescriptor /FontName /CraftCJK-W3 /Flags 98 /FontWeight 700 \
+    let descriptor = "<< /Type /FontDescriptor /FontName /EvoCJK-W3 /Flags 98 /FontWeight 700 \
                       /FontBBox [0 -120 1000 880] /ItalicAngle -12 /Ascent 880 /Descent -120 /CapHeight 700 /StemV 120 >>";
     let queries = fallback_queries(fixture("/FontDescriptor 7 0 R", Some(descriptor)));
     let query = queries.first().expect("the resolver is asked for a fallback");
-    assert_eq!(query.post_script_name.as_deref(), Some("CraftCJK-W3"));
+    assert_eq!(query.post_script_name.as_deref(), Some("EvoCJK-W3"));
     assert!(query.character_collection.as_ref().is_some_and(|cc| cc.family == CidFamily::AdobeGB1), "{query:?}");
     assert!(query.is_serif, "Serif flag of the descendant's descriptor: {query:?}");
     assert!(query.is_italic, "Italic flag of the descendant's descriptor: {query:?}");
@@ -68,7 +68,7 @@ fn a_cid_font_fallback_request_carries_its_descendants_style() {
 fn a_cid_font_without_a_descriptor_asks_for_the_default_style() {
     let queries = fallback_queries(fixture("", None));
     let query = queries.first().expect("the resolver is asked for a fallback");
-    assert_eq!(query.post_script_name.as_deref(), Some("CraftCJK-W3"));
+    assert_eq!(query.post_script_name.as_deref(), Some("EvoCJK-W3"));
     assert!(!query.is_serif && !query.is_italic && !query.is_bold, "{query:?}");
     assert_eq!(query.font_weight, 400);
 }

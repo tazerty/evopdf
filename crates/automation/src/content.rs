@@ -2,7 +2,7 @@
 //! move/resize/retype/restyle it, delete it. Geometry is in points from the top-left of the
 //! displayed page (y down), like every other tool.
 
-use pdfcraft_engine::{ADDED_CHAR_SPACING_LIMIT, AddedContent, AddedText, Edit, FontFamily, TextAlign};
+use evopdf_engine::{ADDED_CHAR_SPACING_LIMIT, AddedContent, AddedText, Edit, FontFamily, TextAlign};
 use serde_json::{Value, json};
 
 use crate::comments::parse_color;
@@ -229,7 +229,7 @@ impl Automation {
         let to_doc = match a.opt_int("to_doc")? {
             Some(d) => {
                 let d = u64::try_from(d).map_err(|_| bad("to_doc must be positive"))?;
-                self.session.get(pdfcraft_engine::DocId(d)).ok_or_else(|| failed(format!("no open document with id {d} (see doc_list)")))?.id
+                self.session.get(evopdf_engine::DocId(d)).ok_or_else(|| failed(format!("no open document with id {d} (see doc_list)")))?.id
             }
             None => from,
         };
@@ -256,8 +256,8 @@ impl Automation {
         };
         let on_page = || doc.added().iter().filter(|x| x.page == to_page);
         let rect = match at {
-            Some(at) => pdfcraft_engine::added_paste_rect(content.rect(), [pw, ph], 0, Some(at)),
-            None => pdfcraft_engine::added_paste_place(on_page().map(|x| &x.content), &content, [pw, ph]),
+            Some(at) => evopdf_engine::added_paste_rect(content.rect(), [pw, ph], 0, Some(at)),
+            None => evopdf_engine::added_paste_place(on_page().map(|x| &x.content), &content, [pw, ph]),
         };
         let before = on_page().count();
         let target = json!({ "doc": to_doc.0 });
@@ -288,7 +288,7 @@ impl Automation {
     }
 
     pub(crate) fn object_move(&mut self, a: &Args) -> Result<Value> {
-        use pdfcraft_engine::{MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
+        use evopdf_engine::{MAX_MOVE_OBJECTS, ObjectKind, ObjectTarget};
         let page = self.page(a)?;
         let rows = a
             .get("objects")
