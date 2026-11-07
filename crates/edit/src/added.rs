@@ -800,7 +800,8 @@ fn type3_shaped(doc: &mut Document, clusters: &[&ShapedCluster], outlines: &Hash
             },
             |f| f.family,
         ),
-        None => "EvoPdf Shaped Text",
+        // Evora (EVORA-COL-73, Q-EVO-1): viewers list this name; nothing reads it back.
+        None => "Colophon Atelier Shaped Text",
     };
     let mut descriptor = Dict::new();
     descriptor.set(b"Type".to_vec(), Object::name("FontDescriptor"));

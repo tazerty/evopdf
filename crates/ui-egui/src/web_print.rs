@@ -128,7 +128,8 @@ pub(crate) fn print_document_html(sheets: &[(f64, f64)], urls: &[String]) -> Str
             html_sheets.push_str(&format!("<div class=\"s{k}\"><img alt=\"\" style=\"width:{w};height:{h}\" src=\"{src}\"></div>"));
         }
     }
-    format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>EvoPdf</title><style>{css}</style></head><body>{html_sheets}</body></html>")
+    let title = crate::i18n::SHOWN_NAME;
+    format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>{title}</title><style>{css}</style></head><body>{html_sheets}</body></html>")
 }
 
 /// A browser print being prepared: the print-ready PDF's sheets drawn one [`WebPrintJob::step`]

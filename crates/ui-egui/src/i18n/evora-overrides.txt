@@ -20,7 +20,46 @@ it	JavaScript di Acrobat	JavaScript PDF
 *	Acrobat 5.0	PDF 1.4
 *	Acrobat 3.0	PDF 1.1
 *	Acrobat	PDF
-# Evora (E2): the product shows as Colophon (Evora decision D-4: technical ids unchanged). The
-# About dialog keeps the upstream name EvoPdf as its credit.
-*	EvoPdf	Colophon
+# Evora (E2, Gabriel's decision Q-EVO-1 of 2026-11-06): on screen the app's name, never the
+# engine's, in every language and in raw engine messages ("msg" also takes the "*" rules). Technical
+# ids stay (Evora decision D-4). i18n::SHOWN_NAME holds the same name for the few strings that are
+# not looked up: window title, About dialog, print page title.
+#
+# English article: the name shown starts with a consonant. "than EvoPdf" and Albanian "shkruan
+# EvoPdf" also hold "an EvoPdf", so these rules are for English only and the leading space means a
+# whole word, the first word of the text included (see evora_display).
+en	 an EvoPdf	 a Colophon Atelier
+en	An EvoPdf	A Colophon Atelier
+msg	 an EvoPdf	 a Colophon Atelier
+msg	An EvoPdf	A Colophon Atelier
+# Suffixes that follow the last vowel or consonant of the name: the catalogs write them for the
+# engine's name. Czech, Finnish, Slovene, Korean, Telugu suffixes read right as they are; no catalog
+# glues an elision (d', l', dell') to the name, and the Hungarian article is already "a".
+tr	EvoPdf'ın	Colophon Atelier'in
+tr	EvoPdf'ta	Colophon Atelier'de
+tr	EvoPdf'a	Colophon Atelier'e
+tr	EvoPdf'ı	Colophon Atelier'i
+hu	EvoPdfban	Colophon Atelierben
+hu	EvoPdfról	Colophon Atelierről
+hu	EvoPdfnak	Colophon Ateliernek
+hu	EvoPdfot	Colophon Ateliert
+kk	EvoPdf-те	Colophon Atelier-де
+# Raw engine messages: what they say of build inputs and of the engine's own releases means nothing
+# in the Atelier, so the sentence ends without that clause.
+msg	Installed fonts…), or use an official release, which includes EvoPdf's fallback fonts (to build them in, set EVO_FONTS_DIR to a evo-fonts checkout)	Installed fonts…)
+msg	Thai text needs a Thai font in this build; rebuild with EVO_FONTS_DIR pointing to evo-fonts with a Thai face	Thai text needs a Thai font, which this build doesn't include
+msg	doesn't include (official releases do; to build it in, set EVO_FONTS_DIR to a evo-fonts checkout)	doesn't include
+msg	doesn't include (to build it in, set EVO_FONTS_DIR to a evo-fonts checkout that has an Arab face)	doesn't include
+msg	doesn't include (to build it in, set EVO_FONTS_DIR to a evo-fonts checkout that has a Hebr face)	doesn't include
+msg	doesn't include (to build it in, set EVO_FONTS_DIR to a evo-fonts checkout that has it)	doesn't include
+# The OCR dialog that names this variable is hidden in the Atelier (and a page has no environment);
+# only the text changes, crates/ocr still reads the variable.
+*	EVOPDF_MODELS	MODELS_DIR
+*	EvoPdf	Colophon Atelier
+*	EvoFilm	Colophon Atelier
+*	EvoVector	Colophon Atelier
+*	EvoPhoto	Colophon Atelier
+*	EvoLight	Colophon Atelier
+*	EvoEffect	Colophon Atelier
+*	EvoDesign	Colophon Atelier
 msg	(Acrobat X and later)	(PDF 2.0 and later)

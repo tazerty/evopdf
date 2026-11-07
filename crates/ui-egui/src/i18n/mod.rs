@@ -33,6 +33,11 @@ use catalog::Catalog;
 /// The `language` preference value that follows the system locale.
 pub const AUTO: &str = "auto";
 
+/// Evora (E2, Q-EVO-1): the name this build shows instead of the engine's. The display overrides
+/// (`evora-overrides.txt`) write it into everything that is looked up; the few strings that are not
+/// (window title, About dialog, print page title) take it from here.
+pub const SHOWN_NAME: &str = "Colophon Atelier";
+
 /// One supported UI language.
 pub struct LangInfo {
     /// BCP 47 code, lowercase (`ja`, `zh-hans`, `pt-br`). Also the `language` preference value.
@@ -586,6 +591,12 @@ pub fn evora_display(code: &str, text: &str) -> Option<String> {
     for rule in display_rules().iter().filter(applies) {
         if out.contains(rule.from) {
             out = out.replace(rule.from, rule.to);
+        }
+        // A rule that starts with a space stands for a whole word, which may open the text.
+        if let Some(word) = rule.from.strip_prefix(' ')
+            && let Some(rest) = out.strip_prefix(word)
+        {
+            out = format!("{}{rest}", rule.to.trim_start());
         }
     }
     Some(out)
@@ -1771,7 +1782,7 @@ mod tests {
         // "حفظ باسم…" as typed; the ellipsis ends the phrase on the left.
         assert_eq!(tr(ar, "Save as…"), "…باسم حفظ");
         // Latin names keep their own direction inside the phrase.
-        assert_eq!(tr(ar, "About EvoPdf"), "EvoPdf حول");
+        assert_eq!(tr(ar, "About EvoPdf"), "Colophon Atelier حول");
         // A caption's colon stays beside the widget on its right.
         assert_eq!(tr(ar, "Name:"), "الاسم:");
         assert_eq!(tr(ar, "Issued by: "), "عن صادرة: ");
@@ -1935,6 +1946,75 @@ mod tests {
         let interface: Vec<(&str, &str)> = Lang::all().map(|l| (l.code(), l.name())).collect();
         let dates: Vec<(&str, &str)> = evopdf_engine::dates::DATE_LANGUAGES.iter().map(|l| (l.code, l.name)).collect();
         assert_eq!(dates, interface);
+    }
+
+    /// Evora (E2, Q-EVO-1): on screen the app's name, never the engine's.
+    #[test]
+    fn the_app_is_called_colophon_atelier_on_screen() {
+        assert_eq!(tr(Lang::EN, "Welcome to EvoPdf"), format!("Welcome to {SHOWN_NAME}"));
+        assert_eq!(tr(Lang::EN, "About EvoPdf"), "About Colophon Atelier");
+        // The article follows the name's new first letter, capital included; "than" holds no article.
+        assert_eq!(tr(Lang::EN, "Open an EvoPdf file"), "Open a Colophon Atelier file");
+        assert_eq!(tr(Lang::EN, "An EvoPdf file"), "A Colophon Atelier file");
+        assert_eq!(tr(Lang::EN, "an EvoPdf file"), "a Colophon Atelier file");
+        assert_eq!(tr(Lang::EN, "more evidence than EvoPdf reads"), "more evidence than Colophon Atelier reads");
+        // A sibling engine's name, should a shared library bring one to the screen.
+        assert_eq!(tr(Lang::EN, "sRGB (EvoPhoto)"), "sRGB (Colophon Atelier)");
+        let shown = |code: &str, text: &str| tr(Lang::from_code(code).unwrap(), text).to_string();
+        assert_eq!(shown("fr", "About EvoPdf"), "À propos de Colophon Atelier");
+        // Suffixes follow the name shown.
+        assert_eq!(shown("hu", "About EvoPdf"), "A Colophon Atelierről");
+        assert_eq!(shown("hu", "Welcome to EvoPdf"), "Üdvözöljük a Colophon Atelierben");
+        assert_eq!(shown("tr", "Welcome to EvoPdf"), "Colophon Atelier'e Hoş Geldiniz");
+        assert!(shown("kk", "Files you open in EvoPdf appear here. Drop a PDF anywhere to open it.").starts_with("Colophon Atelier-де"));
+        assert!(shown("cs", "Files you open in EvoPdf appear here. Drop a PDF anywhere to open it.").contains("Colophon Atelieru"));
+    }
+
+    /// Every row of every catalog, as a lookup returns it: no engine's name in any spelling.
+    #[test]
+    fn no_language_shows_an_engine_name() {
+        const NAMES: [&str; 10] =
+            ["evopdf", "evofilm", "evovector", "evophoto", "evolight", "evoeffect", "evodesign", "evo apps", "upstream", "evorules"];
+        for lang in Lang::all() {
+            let (entries, _) = parse_entries(lang.0.source, lang.0.plural_forms());
+            for entry in entries {
+                let shown = evora_display(lang.code(), &entry.translation).unwrap_or(entry.translation);
+                let lower = shown.to_lowercase();
+                assert!(!NAMES.iter().any(|name| lower.contains(*name)), "{}: {:?} shows {shown:?}", lang.code(), entry.source);
+            }
+        }
+    }
+
+    /// Raw engine messages (notifications, form bars) name the app and no build input.
+    #[test]
+    fn raw_engine_messages_name_the_app() {
+        assert_eq!(
+            evora_message("this text needs EvoPdf's Japanese fallback font, which this build doesn't include (official releases do; to build it in, set EVO_FONTS_DIR to a evo-fonts checkout)".into()),
+            "this text needs Colophon Atelier's Japanese fallback font, which this build doesn't include"
+        );
+        assert_eq!(
+            evora_message("choose a font that has it (Load font… or Installed fonts…), or use an official release, which includes EvoPdf's fallback fonts (to build them in, set EVO_FONTS_DIR to a evo-fonts checkout)".into()),
+            "choose a font that has it (Load font… or Installed fonts…)"
+        );
+        assert_eq!(
+            evora_message("Arabic text needs EvoPdf's Arabic font, which this build doesn't include (to build it in, set EVO_FONTS_DIR to a evo-fonts checkout that has an Arab face)".into()),
+            "Arabic text needs Colophon Atelier's Arabic font, which this build doesn't include"
+        );
+        assert_eq!(
+            evora_message("they are shown as ? until EvoPdf can embed fonts for them".into()),
+            "they are shown as ? until Colophon Atelier can embed fonts for them"
+        );
+        assert_eq!(
+            evora_message("Thai text needs a Thai font in this build; rebuild with EVO_FONTS_DIR pointing to evo-fonts with a Thai face".into()),
+            "Thai text needs a Thai font, which this build doesn't include"
+        );
+        // A reader's own detail, filled raw into a signature's sentence (Signatures panel).
+        assert_eq!(
+            evora_message("The signature could not be checked (the /DSS holds more revocation evidence than EvoPdf reads).".into()),
+            "The signature could not be checked (the /DSS holds more revocation evidence than Colophon Atelier reads)."
+        );
+        // Nothing else in a message moves.
+        assert_eq!(evora_message("page 3 could not be read".into()), "page 3 could not be read");
     }
 }
 

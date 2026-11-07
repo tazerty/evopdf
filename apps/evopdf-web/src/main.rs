@@ -107,7 +107,7 @@ fn main() {
                         bridge.post_ready();
                     } else if query_param("host").as_deref() == Some("parent") {
                         eframe::web_sys::console::warn_1(
-                            &"EvoPdf: ?host=parent needs a framing page on the same origin; saves download instead".into(),
+                            &"Colophon Atelier: ?host=parent needs a framing page on the same origin; saves download instead".into(),
                         );
                     }
                     Ok(Box::new(EvoraApp {

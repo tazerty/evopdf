@@ -362,7 +362,7 @@ fn assess(bytes: &Arc<Vec<u8>>, password: Option<&str>) -> Result<Assessed, Asse
             tl!("Protected: the combined file won't keep its security settings").to_string()
         });
     }
-    notes.extend(warnings.into_iter().take(5));
+    notes.extend(warnings.into_iter().take(5).map(crate::i18n::evora_message));
     Ok(Assessed { pages, sizes, problem, lock, notes })
 }
 

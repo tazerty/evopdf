@@ -4986,7 +4986,7 @@ fn notices(
             crate::i18n::fmt(tl!("Dynamic XFA form laid out from its template: {pages}, {fields}."), &[("pages", &pages), ("fields", &fields)]);
         if !x.warnings.is_empty() {
             // The notes are clauses ("a picture is left out"); the first starts a sentence here.
-            let notes = x.warnings.join("; ");
+            let notes = crate::i18n::evora_message(x.warnings.join("; "));
             let mut chars = notes.chars();
             text.push(' ');
             text.extend(chars.next().into_iter().flat_map(char::to_uppercase));
@@ -5031,7 +5031,7 @@ fn notices(
     } else if repaired {
         Some(("bandage", tl!("This file was damaged and has been repaired. Saving keeps the repaired version.").to_string(), false))
     } else if !info.warnings.is_empty() {
-        Some(("triangle-alert", info.warnings[0].clone(), false))
+        Some(("triangle-alert", crate::i18n::evora_message(info.warnings[0].clone()), false))
     } else {
         None
     };

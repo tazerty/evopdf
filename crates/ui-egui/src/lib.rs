@@ -3732,7 +3732,7 @@ impl eframe::App for EvoPdfApp {
             .active
             .and_then(|i| crate::canvas::tab_label(self, i))
             .or_else(|| self.combine_showing().then(|| tl!("Combine files").to_owned()))
-            .map_or_else(|| "EvoPdf".to_owned(), |name| format!("{name} — EvoPdf"));
+            .map_or_else(|| i18n::SHOWN_NAME.to_owned(), |name| format!("{name} — {}", i18n::SHOWN_NAME));
         if title != self.window_title {
             ctx.send_viewport_cmd(egui::ViewportCommand::Title(title.clone()));
             self.window_title = title;

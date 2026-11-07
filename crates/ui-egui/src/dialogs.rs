@@ -1306,7 +1306,7 @@ fn dialogs(app: &mut EvoPdfApp, ctx: &egui::Context) {
                     _ => {
                         // Evora (E1): no Upstream mark or wordmark. The plain-text credit to the
                         // Upstream Team ships with the licences (LICENSES/ in the artefact).
-                        ui.label(egui::RichText::new("EvoPdf").font(theme::semibold(20.0)));
+                        ui.label(egui::RichText::new(crate::i18n::SHOWN_NAME).font(theme::semibold(20.0)));
                         ui.label(crate::i18n::fmt(tl!("Version {v}"), &[("v", &evopdf_engine::build_info::version())]));
                         ui.add_space(6.0);
                         ui.label(tl!("A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0."));
