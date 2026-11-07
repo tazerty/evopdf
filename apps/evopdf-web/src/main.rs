@@ -1648,6 +1648,10 @@ mod ehp {
         if !(lang_ok && accent_ok && read_only_ok && caps_ok && prefs_ok && limits_ok) {
             return;
         }
+        // EVORA-COL-74: the member's colour, before the app's first style.
+        if let Some(value) = get(p, "accent").as_string() {
+            evopdf_ui_egui::theme::set_host_accent(&value);
+        }
         // The effective set: what the host offers and this engine declares (§9).
         let caps: Vec<String> = caps.into_iter().filter(|c| CAPABILITIES.contains(&c.as_str())).collect();
         // E5 (§7.1 step 6, §7.7 b), before the answer: this account's settings are read (only with
@@ -1845,7 +1849,10 @@ mod ehp {
         if !only_keys(p, &["theme", "accent"]) || !accent_ok {
             return;
         }
-        // The accent is Evora's indigo already (patch E2); only light or dark changes here.
+        // EVORA-COL-74: the member's colour, then light or dark, which restyles the interface with it.
+        if let Some(value) = get(p, "accent").as_string() {
+            evopdf_ui_egui::theme::set_host_accent(&value);
+        }
         st.events.borrow_mut().push(HostEvent::Theme(dark));
         ack(&st, id, true, None);
         st.ctx.request_repaint();

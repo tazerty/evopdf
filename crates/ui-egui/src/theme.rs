@@ -1,6 +1,7 @@
 //! Design tokens and egui style (plan/acrobat/02-ui-ux.md §1: neutral chrome, white panels,
 //! one blue accent; Dark Gray keeps pages white). Every custom widget reads `Tokens::get`.
 
+use std::cell::Cell;
 use std::sync::Arc;
 
 use egui::epaint::text::{FontTweak, HintingTarget, SmoothHinting};
@@ -68,10 +69,84 @@ pub struct Tokens {
     pub radius: u8,
 }
 
+/// Evora's indigo, the colour the tokens below are written in.
+const INDIGO: Color32 = Color32::from_rgb(0x4F, 0x46, 0xE5);
+/// WCAG contrast the member's colour keeps on the panels: marks (with a little room for rounding to
+/// 8 bits) and text.
+const MARK_CONTRAST: f32 = 3.05;
+const TEXT_CONTRAST: f32 = 4.55;
+/// Share of the member's colour in the selection tint, as indigo-100 on white and indigo-900 on the
+/// dark panels.
+const TINT_LIGHT: f32 = 0.15;
+const TINT_DARK: f32 = 0.35;
+/// The steps (twentieths) in which a shade moves until it reaches its contrast floor.
+const SHADE_STEPS: u32 = 20;
+
+thread_local! {
+    /// Evora (EVORA-COL-74): the member's colour the host sent, `None` for the indigo.
+    static HOST_ACCENT: Cell<Option<Color32>> = const { Cell::new(None) };
+}
+
+/// Evora (EVORA-COL-74): the host's accent (`#rrggbb`, checked by the bridge) for every later
+/// [`Tokens::for_kind`]. The indigo keeps the written tokens to the byte.
+pub fn set_host_accent(value: &str) {
+    let accent = u32::from_str_radix(value.trim_start_matches('#'), 16)
+        .ok()
+        .map(|s| Color32::from_rgb((s >> 16) as u8, (s >> 8) as u8, s as u8))
+        .filter(|c| *c != INDIGO);
+    HOST_ACCENT.with(|a| a.set(accent));
+}
+
+fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
+    let channel = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * amount).round() as u8;
+    Color32::from_rgb(channel(from.r(), to.r()), channel(from.g(), to.g()), channel(from.b(), to.b()))
+}
+
+/// WCAG contrast ratio of two opaque colours (1 to 21).
+fn contrast(a: Color32, b: Color32) -> f32 {
+    let linear = |v: u8| {
+        let s = f32::from(v) / 255.0;
+        if s <= 0.04045 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
+    };
+    let luminance = |c: Color32| 0.2126 * linear(c.r()) + 0.7152 * linear(c.g()) + 0.0722 * linear(c.b());
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+/// `from` moved toward `to` until it reaches `ratio` on every colour of `on`.
+fn reach(from: Color32, to: Color32, on: &[Color32], ratio: f32) -> Color32 {
+    (0..=SHADE_STEPS)
+        .map(|i| mix(from, to, i as f32 / SHADE_STEPS as f32))
+        .find(|c| on.iter().all(|b| contrast(*c, *b) >= ratio))
+        .unwrap_or(to)
+}
+
 impl Tokens {
+    /// The tokens of a theme, with the member's colour when the host sent one.
+    pub fn for_kind(kind: ThemeKind) -> Self {
+        let written = Self::written(kind);
+        match HOST_ACCENT.with(Cell::get) {
+            Some(accent) => written.with_host_accent(accent),
+            None => written,
+        }
+    }
+
+    /// Evora (EVORA-COL-74): the member's colour in place of the whole indigo family. Filled marks
+    /// hold 3:1 and text 4.5:1 on the panels, as the indigo scale does; the selection tint takes the
+    /// same share of it as the scale took of the indigo.
+    fn with_host_accent(self, accent: Color32) -> Tokens {
+        let dark = self.dark();
+        let toward = if dark { Color32::WHITE } else { Color32::BLACK };
+        let tint = if dark { mix(self.panel, accent, TINT_DARK) } else { mix(Color32::WHITE, accent, TINT_LIGHT) };
+        let surfaces = [self.panel, self.card, self.chrome, self.pasteboard];
+        let mark = reach(accent, toward, &surfaces, MARK_CONTRAST);
+        let text_on = [self.panel, self.card, self.chrome, self.pasteboard, tint];
+        Tokens { selected: tint, accent: mark, accent_text: reach(accent, toward, &text_on, TEXT_CONTRAST), accent_soft: tint, badge_new: mark, ..self }
+    }
+
     /// Evora (E2): the accent family is Evora's indigo (primary #4F46E5, Tailwind indigo scale)
     /// instead of upstream's blue (#1B63E0 light, #4B8BF5 dark); neutral greys are unchanged.
-    pub fn for_kind(kind: ThemeKind) -> Self {
+    fn written(kind: ThemeKind) -> Self {
         match kind {
             ThemeKind::Light => Self {
                 kind,
