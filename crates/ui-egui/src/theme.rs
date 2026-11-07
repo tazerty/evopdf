@@ -102,17 +102,6 @@ fn mix(from: Color32, to: Color32, amount: f32) -> Color32 {
     Color32::from_rgb(channel(from.r(), to.r()), channel(from.g(), to.g()), channel(from.b(), to.b()))
 }
 
-/// WCAG contrast ratio of two opaque colours (1 to 21).
-fn contrast(a: Color32, b: Color32) -> f32 {
-    let linear = |v: u8| {
-        let s = f32::from(v) / 255.0;
-        if s <= 0.04045 { s / 12.92 } else { ((s + 0.055) / 1.055).powf(2.4) }
-    };
-    let luminance = |c: Color32| 0.2126 * linear(c.r()) + 0.7152 * linear(c.g()) + 0.0722 * linear(c.b());
-    let (x, y) = (luminance(a), luminance(b));
-    (x.max(y) + 0.05) / (x.min(y) + 0.05)
-}
-
 /// `from` moved toward `to` until it reaches `ratio` on every colour of `on`.
 fn reach(from: Color32, to: Color32, on: &[Color32], ratio: f32) -> Color32 {
     (0..=SHADE_STEPS)
